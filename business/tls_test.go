@@ -14,6 +14,7 @@ import (
 
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/kubernetes"
+	"github.com/kiali/kiali/kubernetes/cache"
 	"github.com/kiali/kiali/kubernetes/kubetest"
 	"github.com/kiali/kiali/tests/data"
 	core_v1 "k8s.io/api/core/v1"
@@ -24,22 +25,20 @@ func TestMeshStatusEnabled(t *testing.T) {
 	conf := config.NewConfig()
 	config.Set(conf)
 
-	dr := data.AddTrafficPolicyToDestinationRule(data.CreateMTLSTrafficPolicyForDestinationRules(),
-		data.CreateEmptyDestinationRule("test", "default", "*.local"))
+	ns := []string{"test"}
+	pa := fakeStrictMeshPeerAuthentication("default")
+	dr := []networking_v1alpha3.DestinationRule{
+		*data.AddTrafficPolicyToDestinationRule(data.CreateMTLSTrafficPolicyForDestinationRules(),
+			data.CreateEmptyDestinationRule("test", "default", "*.local"))}
 
 	k8s := new(kubetest.K8SClientMock)
-	fakeIstioObjects := []runtime.Object{}
-	fakeIstioObjects = append(fakeIstioObjects, dr)
-	for _, p := range fakeStrictMeshPeerAuthentication("default") {
-		fakeIstioObjects = append(fakeIstioObjects, p.DeepCopyObject())
-	}
-	k8s.MockIstio(fakeIstioObjects...)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
+	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
+	k8s.On("GetToken").Return("token")
 
-	tlsService := getTLSService(k8s, false)
-	status, err := (tlsService).MeshWidemTLSStatus([]string{"test"})
+	tlsService := getTLSService(k8s, false, ns, pa, dr)
+	status, err := (tlsService).MeshWidemTLSStatus(ns)
 
 	assert.NoError(err)
 	assert.Equal(MTLSEnabled, status.Status)
@@ -50,19 +49,17 @@ func TestMeshStatusEnabledAutoMtls(t *testing.T) {
 	conf := config.NewConfig()
 	config.Set(conf)
 
+	ns := []string{"test"}
+	pa := fakeStrictMeshPeerAuthentication("default")
+	dr := []networking_v1alpha3.DestinationRule{}
+
 	k8s := new(kubetest.K8SClientMock)
 
-	fakeIstioObjects := []runtime.Object{}
-	for _, p := range fakeStrictMeshPeerAuthentication("default") {
-		fakeIstioObjects = append(fakeIstioObjects, &p)
-	}
-	k8s.MockIstio(fakeIstioObjects...)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
 
-	tlsService := getTLSService(k8s, true)
-	status, err := (tlsService).MeshWidemTLSStatus([]string{"test"})
+	tlsService := getTLSService(k8s, true, ns, pa, dr)
+	status, err := (tlsService).MeshWidemTLSStatus(ns)
 
 	assert.NoError(err)
 	assert.Equal(MTLSEnabled, status.Status)
@@ -73,22 +70,18 @@ func TestMeshStatusPartiallyEnabled(t *testing.T) {
 	conf := config.NewConfig()
 	config.Set(conf)
 
-	dr := data.AddTrafficPolicyToDestinationRule(data.CreateMTLSTrafficPolicyForDestinationRules(),
-		data.CreateEmptyDestinationRule("istio-system", "default", "sleep.foo.svc.cluster.local"))
+	ns := []string{"test"}
+	pa := fakeStrictMeshPeerAuthentication("default")
+	dr := []networking_v1alpha3.DestinationRule{
+		*data.AddTrafficPolicyToDestinationRule(data.CreateMTLSTrafficPolicyForDestinationRules(),
+			data.CreateEmptyDestinationRule("istio-system", "default", "sleep.foo.svc.cluster.local"))}
 
 	k8s := new(kubetest.K8SClientMock)
-	fakeIstioObjects := []runtime.Object{}
-	fakeIstioObjects = append(fakeIstioObjects, dr)
-	for _, p := range fakeStrictMeshPeerAuthentication("default") {
-		fakeIstioObjects = append(fakeIstioObjects, &p)
-	}
-	k8s.MockIstio(fakeIstioObjects...)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
 
-	tlsService := getTLSService(k8s, false)
-	status, err := (tlsService).MeshWidemTLSStatus([]string{"test"})
+	tlsService := getTLSService(k8s, false, ns, pa, dr)
+	status, err := (tlsService).MeshWidemTLSStatus(ns)
 
 	assert.NoError(err)
 	assert.Equal(MTLSPartiallyEnabled, status.Status)
@@ -99,19 +92,19 @@ func TestMeshStatusNotEnabled(t *testing.T) {
 	conf := config.NewConfig()
 	config.Set(conf)
 
-	dr := data.AddTrafficPolicyToDestinationRule(data.CreateMTLSTrafficPolicyForDestinationRules(),
-		data.CreateEmptyDestinationRule("istio-system", "default", "sleep.foo.svc.cluster.local"))
+	ns := []string{"test"}
+	pa := []security_v1beta1.PeerAuthentication{}
+	dr := []networking_v1alpha3.DestinationRule{
+		*data.AddTrafficPolicyToDestinationRule(data.CreateMTLSTrafficPolicyForDestinationRules(),
+			data.CreateEmptyDestinationRule("istio-system", "default", "sleep.foo.svc.cluster.local"))}
 
 	k8s := new(kubetest.K8SClientMock)
-	fakeIstioObjects := []runtime.Object{}
-	fakeIstioObjects = append(fakeIstioObjects, dr)
-	k8s.MockIstio(fakeIstioObjects...)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
 	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
 
-	tlsService := getTLSService(k8s, false)
-	status, err := (tlsService).MeshWidemTLSStatus([]string{"test"})
+	tlsService := getTLSService(k8s, false, ns, pa, dr)
+	status, err := (tlsService).MeshWidemTLSStatus(ns)
 
 	assert.NoError(err)
 	assert.Equal(MTLSNotEnabled, status.Status)
@@ -122,22 +115,19 @@ func TestMeshStatusDisabled(t *testing.T) {
 	conf := config.NewConfig()
 	config.Set(conf)
 
-	dr := data.AddTrafficPolicyToDestinationRule(data.CreateDisabledMTLSTrafficPolicyForDestinationRules(),
-		data.CreateEmptyDestinationRule("istio-system", "default", "*.local"))
+	ns := []string{"test"}
+	pa := fakeMeshPeerAuthenticationWithMtlsMode("default", "DISABLE")
+	dr := []networking_v1alpha3.DestinationRule{
+		*data.AddTrafficPolicyToDestinationRule(data.CreateDisabledMTLSTrafficPolicyForDestinationRules(),
+			data.CreateEmptyDestinationRule("istio-system", "default", "*.local"))}
 
 	k8s := new(kubetest.K8SClientMock)
-	fakeIstioObjects := []runtime.Object{}
-	fakeIstioObjects = append(fakeIstioObjects, dr)
-	for _, p := range fakeMeshPeerAuthenticationWithMtlsMode("default", "DISABLE") {
-		fakeIstioObjects = append(fakeIstioObjects, &p)
-	}
-	k8s.MockIstio(fakeIstioObjects...)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
 	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
 
-	tlsService := getTLSService(k8s, false)
-	status, err := (tlsService).MeshWidemTLSStatus([]string{"test"})
+	tlsService := getTLSService(k8s, false, ns, pa, dr)
+	status, err := (tlsService).MeshWidemTLSStatus(ns)
 
 	assert.NoError(err)
 	assert.Equal(MTLSDisabled, status.Status)
@@ -148,15 +138,16 @@ func TestMeshStatusNotEnabledAutoMtls(t *testing.T) {
 	conf := config.NewConfig()
 	config.Set(conf)
 
+	ns := []string{"test"}
+	pa := []security_v1beta1.PeerAuthentication{}
+	dr := []networking_v1alpha3.DestinationRule{}
+
 	k8s := new(kubetest.K8SClientMock)
-	fakeIstioObjects := []runtime.Object{}
-	k8s.MockIstio(fakeIstioObjects...)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
 
-	tlsService := getTLSService(k8s, true)
-	status, err := (tlsService).MeshWidemTLSStatus([]string{"test"})
+	tlsService := getTLSService(k8s, true, ns, pa, dr)
+	status, err := (tlsService).MeshWidemTLSStatus(ns)
 
 	assert.NoError(err)
 	assert.Equal(MTLSNotEnabled, status.Status)
@@ -358,7 +349,8 @@ func fakePeerAuthn(name, namespace string, peers *api_security_v1beta1.PeerAuthe
 	return []security_v1beta1.PeerAuthentication{*data.CreateEmptyPeerAuthentication(name, namespace, peers)}
 }
 
-func getTLSService(k8s kubernetes.ClientInterface, autoMtls bool) *TLSService {
+func getTLSService(k8s kubernetes.ClientInterface, autoMtls bool, namespaces []string, pa []security_v1beta1.PeerAuthentication, dr []networking_v1alpha3.DestinationRule) *TLSService {
+	kialiCache = cache.FakeTlsKialiCache("token", namespaces, pa, dr)
 	return &TLSService{k8s: k8s, businessLayer: NewWithBackends(k8s, nil, nil), enabledAutoMtls: &autoMtls}
 }
 
