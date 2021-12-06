@@ -67,9 +67,9 @@ func FakeTlsKialiCache(token string, namespaces []string, pa []security_v1beta1.
 			DestinationRules: []networking_v1alpha3.DestinationRule{},
 		},
 	}
-	for _, d := range dr {
-		registryStatus.Configuration.DestinationRules = append(registryStatus.Configuration.DestinationRules, d)
-	}
+
+	registryStatus.Configuration.DestinationRules = append(registryStatus.Configuration.DestinationRules, dr...)
+
 	kialiCacheImpl.SetRegistryStatus(&registryStatus)
 
 	return &kialiCacheImpl

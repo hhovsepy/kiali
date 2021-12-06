@@ -17,7 +17,6 @@ import (
 	"github.com/kiali/kiali/kubernetes/cache"
 	"github.com/kiali/kiali/kubernetes/kubetest"
 	"github.com/kiali/kiali/tests/data"
-	core_v1 "k8s.io/api/core/v1"
 )
 
 func TestMeshStatusEnabled(t *testing.T) {
@@ -34,7 +33,9 @@ func TestMeshStatusEnabled(t *testing.T) {
 	k8s := new(kubetest.K8SClientMock)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
+	k8s.On("PeerAuthentications", mock.AnythingOfType("string")).Return(pa)
+	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(fakeNamespaces(), nil)
+	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(kubetest.FakeNamespace("test"), nil)
 	k8s.On("GetToken").Return("token")
 
 	tlsService := getTLSService(k8s, false, ns, pa, dr)
@@ -57,6 +58,10 @@ func TestMeshStatusEnabledAutoMtls(t *testing.T) {
 
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
+	k8s.On("PeerAuthentications", mock.AnythingOfType("string")).Return(pa)
+	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(fakeNamespaces(), nil)
+	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(kubetest.FakeNamespace("test"), nil)
+	k8s.On("GetToken").Return("token")
 
 	tlsService := getTLSService(k8s, true, ns, pa, dr)
 	status, err := (tlsService).MeshWidemTLSStatus(ns)
@@ -79,6 +84,10 @@ func TestMeshStatusPartiallyEnabled(t *testing.T) {
 	k8s := new(kubetest.K8SClientMock)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
+	k8s.On("PeerAuthentications", mock.AnythingOfType("string")).Return(pa)
+	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(fakeNamespaces(), nil)
+	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(kubetest.FakeNamespace("test"), nil)
+	k8s.On("GetToken").Return("token")
 
 	tlsService := getTLSService(k8s, false, ns, pa, dr)
 	status, err := (tlsService).MeshWidemTLSStatus(ns)
@@ -101,7 +110,11 @@ func TestMeshStatusNotEnabled(t *testing.T) {
 	k8s := new(kubetest.K8SClientMock)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
+	k8s.On("PeerAuthentications", mock.AnythingOfType("string")).Return(pa)
+	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(fakeNamespaces(), nil)
+	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(kubetest.FakeNamespace("test"), nil)
+	k8s.On("GetToken").Return("token")
+
 
 	tlsService := getTLSService(k8s, false, ns, pa, dr)
 	status, err := (tlsService).MeshWidemTLSStatus(ns)
@@ -124,7 +137,11 @@ func TestMeshStatusDisabled(t *testing.T) {
 	k8s := new(kubetest.K8SClientMock)
 	k8s.On("IsMaistraApi").Return(false)
 	k8s.On("IsOpenShift").Return(false)
-	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(&core_v1.Namespace{}, nil)
+	k8s.On("PeerAuthentications", mock.AnythingOfType("string")).Return(pa)
+	k8s.On("GetNamespaces", mock.AnythingOfType("string")).Return(fakeNamespaces(), nil)
+	k8s.On("GetNamespace", mock.AnythingOfType("string")).Return(kubetest.FakeNamespace("test"), nil)
+	k8s.On("GetToken").Return("token")
+
 
 	tlsService := getTLSService(k8s, false, ns, pa, dr)
 	status, err := (tlsService).MeshWidemTLSStatus(ns)
