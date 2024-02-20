@@ -421,6 +421,19 @@ func (workload *Workload) HasIstioSidecar() bool {
 	return workload.Pods.HasIstioSidecar()
 }
 
+// IsGateway return true if the workload is Ingress or Egress Gateway
+func (workload *Workload) IsGateway() bool {
+	if workload.Type == "Deployment" {
+		if labelValue, ok := workload.Labels["operator.istio.io/component"]; ok && (labelValue == "IngressGateways" || labelValue == "EgressGateways") {
+			return true
+		}
+		if labelValue, ok := workload.Labels["istio"]; ok && (labelValue == "ingressgateway" || labelValue == "egressgateway") {
+			return true
+		}
+	}
+	return false
+}
+
 // HasIstioSidecar returns true if there is at least one workload which has a sidecar
 func (workloads WorkloadOverviews) HasIstioSidecar() bool {
 	if len(workloads) > 0 {

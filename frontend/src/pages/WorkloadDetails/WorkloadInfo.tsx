@@ -21,6 +21,7 @@ import { GraphEdgeTapEvent } from '../../components/CytoscapeGraph/CytoscapeGrap
 import history, { URLParam } from '../../app/History';
 import MiniGraphCardContainer from '../../components/CytoscapeGraph/MiniGraphCard';
 import IstioConfigCard from '../../components/IstioConfigCard/IstioConfigCard';
+import { isGateway } from '../../helpers/LabelFilterHelper';
 
 type WorkloadInfoProps = {
   duration: DurationInSeconds;
@@ -140,7 +141,7 @@ class WorkloadInfo extends React.Component<WorkloadInfoProps, WorkloadInfoState>
           valid: true,
           checks: []
         };
-        if (!isIstioNamespace(this.props.namespace)) {
+        if (!isIstioNamespace(this.props.namespace) && !isGateway(this.props.workload?.labels || {})) {
           if (!pod.istioContainers || pod.istioContainers.length === 0) {
             validations.pod[pod.name].checks.push(noIstiosidecar);
           } else {
