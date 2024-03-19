@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/kiali/kiali/config"
@@ -329,10 +330,12 @@ func (in *AppService) fetchNamespaceApps(ctx context.Context, namespace string, 
 		appNameSelector = selector.String()
 	}
 
-	// Check if user has access to the namespace (RBAC) in cache scenarios and/or
-	// if namespace is accessible from Kiali (Deployment.AccessibleNamespaces)
-	if _, err := in.businessLayer.Namespace.GetClusterNamespace(ctx, namespace, cluster); err != nil {
-		return nil, err
+	if namespace != meta_v1.NamespaceAll {
+		// Check if user has access to the namespace (RBAC) in cache scenarios and/or
+		// if namespace is accessible from Kiali (Deployment.AccessibleNamespaces)
+		if _, err := in.businessLayer.Namespace.GetClusterNamespace(ctx, namespace, cluster); err != nil {
+			return nil, err
+		}
 	}
 
 	var err error

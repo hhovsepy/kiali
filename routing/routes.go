@@ -648,6 +648,26 @@ func NewRoutes(conf *config.Config, kialiCache cache.KialiCache, clientFactory k
 			handlers.WorkloadUpdate,
 			true,
 		},
+		// swagger:route GET /clusters/apps apps appList
+		// ---
+		// Endpoint to get the list of apps for a cluster
+		//
+		//     Produces:
+		//     - application/json
+		//
+		//     Schemes: http, https
+		//
+		// responses:
+		//      500: internalError
+		//      200: appListResponse
+		//
+		{
+			"ClusterApps",
+			"GET",
+			"/api/clusters/apps",
+			handlers.ClustersApps,
+			true,
+		},
 		// swagger:route GET /namespaces/{namespace}/apps apps appList
 		// ---
 		// Endpoint to get the list of apps for a namespace

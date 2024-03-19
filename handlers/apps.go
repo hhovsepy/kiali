@@ -2,12 +2,16 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/kiali/kiali/models"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 
 	"github.com/kiali/kiali/business"
+
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // appParams holds the path and query parameters for appList and appDetails
@@ -44,7 +48,77 @@ func (p *appParams) extract(r *http.Request) {
 	}
 }
 
+// ClustersApps is the API handler to fetch all the apps to be displayed, related to a single cluster
+func ClustersApps(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	namespaces := query.Get("namespaces") // csl of namespaces
+	nss := []string{}
+	if len(namespaces) > 0 {
+		nss = strings.Split(namespaces, ",")
+	}
+	p := appParams{}
+	p.extract(r)
+
+	criteria := business.AppCriteria{
+		Cluster: p.ClusterName,
+		// Load services from all namespaces cache for particular cluster, then will filter them
+		Namespace:             meta_v1.NamespaceAll,
+		IncludeIstioResources: p.IncludeIstioResources,
+		IncludeHealth:         p.IncludeHealth,
+		RateInterval:          p.RateInterval,
+		QueryTime:             p.QueryTime,
+	}
+
+	// Get business layer
+	business, err := getBusiness(r)
+	if err != nil {
+		RespondWithError(w, http.StatusInternalServerError, "Apps initialization error: "+err.Error())
+		return
+	}
+
+	if criteria.IncludeHealth {
+		namespaces, _ := business.Namespace.GetClusterNamespaces(r.Context(), criteria.Cluster)
+		if len(namespaces) == 0 {
+			err = fmt.Errorf("No namespaces found for cluster  [%s]", criteria.Cluster)
+			handleErrorResponse(w, err, "Error looking for namespaces: "+err.Error())
+			return
+		}
+		ns := GetOldestNamespace(namespaces)
+		rateInterval, err := adjustRateInterval(r.Context(), business, ns.Name, p.RateInterval, p.QueryTime, ns.Cluster)
+		if err != nil {
+			handleErrorResponse(w, err, "Adjust rate interval error: "+err.Error())
+			return
+		}
+		criteria.RateInterval = rateInterval
+	}
+
+	// Fetch and build apps
+	appList, err := business.App.GetAppList(r.Context(), criteria)
+	if err != nil {
+		handleErrorResponse(w, err)
+		return
+	}
+
+	// filter apps by provided namespaces before returning
+	if len(nss) != 0 {
+		result := models.AppList{
+			Apps:    []models.AppListItem{},
+			Cluster: appList.Cluster,
+		}
+		for _, app := range appList.Apps {
+			if app.Cluster == criteria.Cluster {
+				result.Apps = append(result.Apps, app)
+			}
+		}
+		RespondWithJSON(w, http.StatusOK, result)
+	} else {
+		// return services from all namespaces
+		RespondWithJSON(w, http.StatusOK, appList)
+	}
+}
+
 // AppList is the API handler to fetch all the apps to be displayed, related to a single namespace
+// @TODO should be removed as ClustersApps is added, left for Backstage plugin integration
 func AppList(w http.ResponseWriter, r *http.Request) {
 	p := appParams{}
 	p.extract(r)

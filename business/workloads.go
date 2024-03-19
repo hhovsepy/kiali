@@ -632,10 +632,12 @@ func (in *WorkloadService) fetchWorkloadsFromCluster(ctx context.Context, cluste
 
 	ws := models.Workloads{}
 
-	// Check if user has access to the namespace (RBAC) in cache scenarios and/or
-	// if namespace is accessible from Kiali (Deployment.AccessibleNamespaces)
-	if _, err := in.businessLayer.Namespace.GetClusterNamespace(ctx, namespace, cluster); err != nil {
-		return nil, err
+	if namespace != meta_v1.NamespaceAll {
+		// Check if user has access to the namespace (RBAC) in cache scenarios and/or
+		// if namespace is accessible from Kiali (Deployment.AccessibleNamespaces)
+		if _, err := in.businessLayer.Namespace.GetClusterNamespace(ctx, namespace, cluster); err != nil {
+			return nil, err
+		}
 	}
 
 	userClient, ok := in.userClients[cluster]
@@ -667,7 +669,7 @@ func (in *WorkloadService) fetchWorkloadsFromCluster(ctx context.Context, cluste
 	go func() {
 		defer wg.Done()
 		var err error
-		dep, err = kubeCache.GetDeployments(namespace)
+		dep, err = kubeCache.GetDeploymentsWithSelector(namespace, "")
 		if err != nil {
 			log.Errorf("Error fetching Deployments per namespace %s: %s", namespace, err)
 			errChan <- err
@@ -765,7 +767,7 @@ func (in *WorkloadService) fetchWorkloadsFromCluster(ctx context.Context, cluste
 
 		var err error
 		if in.isWorkloadIncluded(kubernetes.DaemonSetType) {
-			daeset, err = kialiCache.GetDaemonSets(namespace)
+			daeset, err = kialiCache.GetDaemonSetsWithSelector(namespace, map[string]string{})
 			if err != nil {
 				log.Errorf("Error fetching DaemonSets per namespace %s: %s", namespace, err)
 			}

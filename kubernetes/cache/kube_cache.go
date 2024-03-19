@@ -69,7 +69,7 @@ type KubeCache interface {
 	GetConfigMap(namespace, name string) (*core_v1.ConfigMap, error)
 	GetDaemonSets(namespace string) ([]apps_v1.DaemonSet, error)
 	GetDaemonSet(namespace, name string) (*apps_v1.DaemonSet, error)
-	GetDaemonSetsWithSelector(namespace string, labelSelector map[string]string) ([]*apps_v1.DaemonSet, error)
+	GetDaemonSetsWithSelector(namespace string, labelSelector map[string]string) ([]apps_v1.DaemonSet, error)
 	GetDeployments(namespace string) ([]apps_v1.Deployment, error)
 	GetDeploymentsWithSelector(namespace string, labelSelector string) ([]apps_v1.Deployment, error)
 	GetDeployment(namespace, name string) (*apps_v1.Deployment, error)
@@ -538,7 +538,7 @@ func (c *kubeCache) GetDaemonSet(namespace, name string) (*apps_v1.DaemonSet, er
 	return retDS, nil
 }
 
-func (c *kubeCache) GetDaemonSetsWithSelector(namespace string, selectorLabels map[string]string) ([]*apps_v1.DaemonSet, error) {
+func (c *kubeCache) GetDaemonSetsWithSelector(namespace string, selectorLabels map[string]string) ([]apps_v1.DaemonSet, error) {
 	defer c.cacheLock.RUnlock()
 	c.cacheLock.RLock()
 
@@ -568,7 +568,7 @@ func (c *kubeCache) GetDaemonSetsWithSelector(namespace string, selectorLabels m
 	}
 
 	// Now, filter by selector
-	retDS := []*apps_v1.DaemonSet{}
+	retDS := []apps_v1.DaemonSet{}
 	for _, ds := range daemonSets {
 
 		labelMap, err := metav1.LabelSelectorAsMap(ds.Spec.Selector)
@@ -583,7 +583,7 @@ func (c *kubeCache) GetDaemonSetsWithSelector(namespace string, selectorLabels m
 			// Do not modify what is returned by the lister since that is shared and will cause data races.
 			svc := ds.DeepCopy()
 			svc.Kind = kubernetes.DaemonSetType
-			retDS = append(retDS, svc)
+			retDS = append(retDS, *svc)
 		}
 	}
 	return retDS, nil
@@ -692,9 +692,29 @@ func (c *kubeCache) GetStatefulSets(namespace string) ([]apps_v1.StatefulSet, er
 	// but it won't prevent other routines from reading from the lister.
 	defer c.cacheLock.RUnlock()
 	c.cacheLock.RLock()
-	statefulSets, err := c.getCacheLister(namespace).statefulSetLister.StatefulSets(namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
+
+	statefulSets := []*apps_v1.StatefulSet{}
+	var err error
+	if namespace == metav1.NamespaceAll {
+		if c.clusterScoped {
+			statefulSets, err = c.clusterCacheLister.statefulSetLister.List(labels.Everything())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			for _, nsCacheLister := range c.nsCacheLister {
+				deploymentsSS, err := nsCacheLister.statefulSetLister.List(labels.Everything())
+				if err != nil {
+					return nil, err
+				}
+				statefulSets = append(statefulSets, deploymentsSS...)
+			}
+		}
+	} else {
+		statefulSets, err = c.getCacheLister(namespace).statefulSetLister.StatefulSets(namespace).List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
 	}
 	log.Tracef("[Kiali Cache] Get [resource: StatefulSet] for [namespace: %s] = %d", namespace, len(statefulSets))
 
@@ -826,9 +846,27 @@ func (c *kubeCache) GetPods(namespace, labelSelector string) ([]core_v1.Pod, err
 		return nil, err
 	}
 
-	pods, err := c.getCacheLister(namespace).podLister.Pods(namespace).List(selector)
-	if err != nil {
-		return nil, err
+	pods := []*core_v1.Pod{}
+	if namespace == metav1.NamespaceAll {
+		if c.clusterScoped {
+			pods, err = c.clusterCacheLister.podLister.List(selector)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			for _, nsCacheLister := range c.nsCacheLister {
+				podsNS, err := nsCacheLister.podLister.List(selector)
+				if err != nil {
+					return nil, err
+				}
+				pods = append(pods, podsNS...)
+			}
+		}
+	} else {
+		pods, err = c.getCacheLister(namespace).podLister.Pods(namespace).List(selector)
+		if err != nil {
+			return nil, err
+		}
 	}
 	log.Tracef("[Kiali Cache] Get [resource: Pod] for [namespace: %s] = %d", namespace, len(pods))
 
@@ -853,9 +891,28 @@ func (c *kubeCache) GetReplicaSets(namespace string) ([]apps_v1.ReplicaSet, erro
 	// but it won't prevent other routines from reading from the lister.
 	defer c.cacheLock.RUnlock()
 	c.cacheLock.RLock()
-	reps, err := c.getCacheLister(namespace).replicaSetLister.ReplicaSets(namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
+	reps := []*apps_v1.ReplicaSet{}
+	var err error
+	if namespace == metav1.NamespaceAll {
+		if c.clusterScoped {
+			reps, err = c.clusterCacheLister.replicaSetLister.List(labels.Everything())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			for _, nsCacheLister := range c.nsCacheLister {
+				repsNS, err := nsCacheLister.replicaSetLister.List(labels.Everything())
+				if err != nil {
+					return nil, err
+				}
+				reps = append(reps, repsNS...)
+			}
+		}
+	} else {
+		reps, err = c.getCacheLister(namespace).replicaSetLister.ReplicaSets(namespace).List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result := []apps_v1.ReplicaSet{}
