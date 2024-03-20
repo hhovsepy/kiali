@@ -528,6 +528,22 @@ export const getApp = (
   return newRequest<App>(HTTP_VERBS.GET, urls.app(namespace, app), queryParams, {});
 };
 
+export const getClusterApps = (
+  namespaces: string,
+  params: AppListQuery,
+  cluster?: string
+): Promise<ApiResponse<AppList>> => {
+  const queryParams: QueryParams<AppListQuery & Namespaces> = {
+    ...params,
+    namespaces: namespaces
+  };
+
+  if (cluster) {
+    queryParams.clusterName = cluster;
+  }
+  return newRequest<AppList>(HTTP_VERBS.GET, urls.clustersApps(), queryParams, {});
+};
+
 export const getApps = (namespace: string, params: AppListQuery): Promise<ApiResponse<AppList>> => {
   return newRequest<AppList>(HTTP_VERBS.GET, urls.apps(namespace), params, {});
 };

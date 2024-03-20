@@ -22,6 +22,10 @@ type AppListItem struct {
 	// required: true
 	// example: reviews
 	Name string `json:"name"`
+	// Namespace where the apps live in
+	// required: true
+	// example: bookinfo
+	Namespace Namespace `json:"namespace"`
 
 	// Cluster of the application
 	// required: true
