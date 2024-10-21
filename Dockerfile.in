@@ -34,7 +34,7 @@ COPY $REMOTE_SOURCE $REMOTE_SOURCE_DIR
 #ENV NPM_CONFIG_TARBALL=$TARBALL_PATH
 
 # required for nodejs
-RUN dnf module -y enable nodejs:20 && dnf install -y nodejs
+#RUN dnf module -y enable nodejs:20 && dnf install -y nodejs
 
 # Required for build
 #   * make gcc-c++ for node-gyp which
