@@ -13,7 +13,7 @@ ARG KIALI_VERSION=${CI_KIALI_UPSTREAM_VERSION_SANITIZED}
 # NPM 10.5.0
 
 #@follow_tag(registry-proxy.engineering.redhat.com/rh-osbs/rhacm2-yarn-builder:rhel_8_nodejs_20_yarn_builder)
-FROM registry-proxy.engineering.redhat.com/rh-osbs/rhacm2-yarn-builder:v2.9.0_20-7 AS uibuilder
+FROM registry.stage.redhat.io/ubi8/ubi-minimal:8.10 AS uibuilder
 
 ARG KIALI_VERSION
 
@@ -32,6 +32,9 @@ ENV SKIP_SASS_BINARY_DOWNLOAD_FOR_CI=true
 ENV RHEL_ALLOW_PYTHON2_FOR_BUILD=1
 ENV KIALI_ENV=production
 ENV NPM_CONFIG_TARBALL=$TARBALL_PATH
+
+# required for nodejs
+RUN dnf module -y enable nodejs:20 && dnf install -y nodejs
 
 # Required for build
 #   * make gcc-c++ for node-gyp which
@@ -63,7 +66,7 @@ RUN rm -rf $REMOTE_SOURCE_DIR
 ###########################################################################
 
 #@follow_tag(registry-proxy.engineering.redhat.com/rh-osbs/openshift-golang-builder:rhel_8_golang_1.22)
-FROM registry-proxy.engineering.redhat.com/rh-osbs/openshift-golang-builder:v1.22.5-202407301728.gd58751c.el8 AS gobuilder
+FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17 AS gobuilder
 
 ARG KIALI_VERSION
 ENV CGO_ENABLED=1
