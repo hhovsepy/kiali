@@ -13,7 +13,7 @@ ARG KIALI_VERSION=${CI_KIALI_UPSTREAM_VERSION_SANITIZED}
 # NPM 10.5.0
 
 #@follow_tag(registry-proxy.engineering.redhat.com/rh-osbs/rhacm2-yarn-builder:rhel_8_nodejs_20_yarn_builder)
-FROM registry.stage.redhat.io/ubi8/ubi-minimal:8.10 AS uibuilder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS uibuilder
 
 ARG KIALI_VERSION
 
