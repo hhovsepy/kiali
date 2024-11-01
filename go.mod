@@ -11,6 +11,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/nitishm/engarde v0.1.1
+	github.com/openkruise/kruise-api v1.7.0
 	github.com/openshift/api v0.0.0-20240109042830-44756aa36879
 	github.com/openshift/client-go v0.0.0-20240109161853-2425b4b6d3b3
 	github.com/prometheus/client_golang v1.17.0

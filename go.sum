@@ -98,6 +98,7 @@ github.com/onsi/ginkgo/v2 v2.19.0 h1:9Cnnf7UHo57Hy3k6/m5k3dRfGTMXGvxhHFvkDTCTpvA
 github.com/onsi/ginkgo/v2 v2.19.0/go.mod h1:rlwLi9PilAFJ8jCg9UE1QP6VBpd6/xj3SRC0d6TU0To=
 github.com/onsi/gomega v1.19.0 h1:4ieX6qQjPP/BfC3mpsAtIGGlxTWPeA3Inl/7DtXw1tw=
 github.com/onsi/gomega v1.19.0/go.mod h1:LY+I3pBVzYsTBU1AnDwOSxaYi9WoWiqgwooUqq9yPro=
+github.com/openkruise/kruise-api v1.7.0/go.mod h1:BXZAyzIPmaF0JEI0YT1fWEYTAcOCJRCzOdCg4BpXbXQ=
 github.com/openshift/api v0.0.0-20240109042830-44756aa36879 h1:9JfgDtOi0be+p2HsXwIahS8rXlt4MQRj6Vlpmx1DDg8=
 github.com/openshift/api v0.0.0-20240109042830-44756aa36879/go.mod h1:qNtV0315F+f8ld52TLtPvrfivZpdimOzTi3kn9IVbtU=
 github.com/openshift/client-go v0.0.0-20240109161853-2425b4b6d3b3 h1:XQv/z/1tedDGPeplmowftfUUrR3BtglN6Hv5kLzy1CU=

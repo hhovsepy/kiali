@@ -37,6 +37,8 @@ import (
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/kubernetes"
 	"github.com/kiali/kiali/log"
+	kruiseinformers "github.com/openkruise/kruise-api/client/informers/externalversions"
+	kruise_v1alpha1_listers "github.com/openkruise/kruise-api/client/listers/apps/v1alpha1"
 )
 
 // checkIstioAPIsExist checks if the istio APIs are present in the cluster
@@ -140,6 +142,9 @@ type cacheLister struct {
 	replicaSetLister  apps_v1_listers.ReplicaSetLister
 	serviceLister     core_v1_listers.ServiceLister
 	statefulSetLister apps_v1_listers.StatefulSetLister
+
+	// advanced listers
+	advancedDaemonSetLister kruise_v1alpha1_listers.DaemonSetLister
 
 	cachesSynced []cache.InformerSynced
 
@@ -355,6 +360,7 @@ func (c *kubeCache) startInformers(namespace string) error {
 		c.createKubernetesInformers(namespace),
 		c.createIstioInformers(namespace),
 		c.createGatewayInformers(namespace),
+		c.createAdvancesInformers(namespace),
 	}
 
 	var scope string
@@ -605,6 +611,57 @@ func (c *kubeCache) createKubernetesInformers(namespace string) informers.Shared
 	}
 
 	return sharedInformers
+}
+
+// createAdvancesInformers creates kube informers for advanced objects such as kruise DaemonSets
+func (c *kubeCache) createAdvancesInformers(namespace string) kruiseinformers.SharedInformerFactory {
+	var opts []kruiseinformers.SharedInformerOption
+	if namespace != "" {
+		opts = append(opts, kruiseinformers.WithNamespace(namespace))
+	}
+
+	kruiseInformers := kruiseinformers.NewSharedInformerFactoryWithOptions(c.client.Kube(), c.refreshDuration, opts...)
+
+	// If this is a namespace-scoped cache, set a watch error handler on all the things we are watching.
+	// If the error is due to the client being forbidden from seeing the resource, this likely means the namespace
+	// has been deleted. In this case, we want to disable this namespace-scoped cache since it will not work for any
+	// resource. We add a watch handler on all informers because we don't know which one will be used first after
+	// the namespace deletion and we want to shut the informers down as quickly as we can.
+	if namespace != "" {
+		informersToWatchList := []cache.SharedIndexInformer{
+			kruiseInformers.Apps().V1alpha1().DaemonSets().Informer(),
+		}
+
+		watchErrorHandler := func(r *cache.Reflector, err error) {
+			if c.errorHandler != nil {
+				c.errorHandler(c, namespace, err)
+			} else {
+				log.Errorf("Error detected when watching namespace [%v] in cluster [%v]. error: %v", namespace, c.client.ClusterInfo().Name, err)
+			}
+		}
+
+		for _, informerToWatch := range informersToWatchList {
+			err := informerToWatch.SetWatchErrorHandler(watchErrorHandler)
+			if err != nil {
+				log.Errorf("Failed to install watch error handler for namespace [%v]; will not detect if it gets deleted", namespace)
+			}
+		}
+	}
+
+	lister := &cacheLister{
+		advancedDaemonSetLister: kruiseInformers.Apps().V1alpha1().DaemonSets().Lister(),
+	}
+	lister.cachesSynced = append(lister.cachesSynced,
+		kruiseInformers.Apps().V1alpha1().DaemonSets().Informer().HasSynced,
+	)
+
+	if c.clusterScoped {
+		c.clusterCacheLister = lister
+	} else {
+		c.nsCacheLister[namespace] = lister
+	}
+
+	return kruiseInformers
 }
 
 func (c *kubeCache) getCacheLister(namespace string) *cacheLister {

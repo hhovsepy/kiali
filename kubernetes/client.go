@@ -47,6 +47,7 @@ type ClusterInfo struct {
 type ClientInterface interface {
 	GetServerVersion() (*version.Info, error)
 	GetToken() string
+	IsKruiseAPI() bool
 	IsOpenShift() bool
 	IsExpGatewayAPI() bool
 	IsGatewayAPI() bool
