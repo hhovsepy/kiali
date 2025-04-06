@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/prometheus/common/model"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/istio"
