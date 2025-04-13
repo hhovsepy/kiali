@@ -14,7 +14,7 @@ require (
 	github.com/nitishm/engarde v0.1.1
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
-	github.com/openshift/api v0.0.0-20240109042830-44756aa36879
+	github.com/openshift/api 10a8fa583797
 	github.com/openshift/client-go v0.0.0-20240109161853-2425b4b6d3b3
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/common v0.55.0
