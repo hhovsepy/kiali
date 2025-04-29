@@ -1,0 +1,120 @@
+#########################################
+# Openshift Istio Kiali container build  #
+##########################################
+# CI_KIALI_UPSTREAM_VERSION_SANITIZED should contain format major.minor.micro e.g. 1.65.7
+ARG KIALI_VERSION=${CI_KIALI_UPSTREAM_VERSION_SANITIZED}
+
+###########################################################################
+# KIALI-UI                         build                                  #
+# https://brewweb.engineering.redhat.com/brew/packageinfo?packageID=79491 #
+###########################################################################
+# Node 20.12.2
+# Yarn 1.22.10
+# NPM 10.5.0
+
+#@follow_tag(registry-proxy.engineering.redhat.com/rh-osbs/rhacm2-yarn-builder:rhel_8_nodejs_20_yarn_builder)
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS uibuilder
+
+ARG KIALI_VERSION
+
+# Copy remote source
+COPY $REMOTE_SOURCE $REMOTE_SOURCE_DIR
+
+## Load Environment
+## Node headers in https://nodejs.org/dist/
+
+#ARG NODEJS_VERSION_IN_BASE_IMAGE=20.12.2
+#ARG NODE_HEADERS="node-v${NODEJS_VERSION_IN_BASE_IMAGE}-headers.tar.gz"
+#COPY $NODE_HEADERS $REMOTE_SOURCE_DIR
+#ARG TARBALL_PATH=$REMOTE_SOURCE_DIR/$NODE_HEADERS
+
+#ENV SKIP_SASS_BINARY_DOWNLOAD_FOR_CI=true
+#ENV RHEL_ALLOW_PYTHON2_FOR_BUILD=1
+#ENV KIALI_ENV=production
+#ENV NPM_CONFIG_TARBALL=$TARBALL_PATH
+
+# required for nodejs
+#RUN dnf module -y enable nodejs:20 && dnf install -y nodejs
+
+# Required for build
+#   * make gcc-c++ for node-gyp which
+#   * python3 for react-scripts
+#
+RUN dnf install -y python3 make gcc-c++
+WORKDIR $REMOTE_SOURCE_DIR/app/frontend
+
+## Replace GIT HASH
+ENV GIT_HASH="REACT_APP_GIT_HASH=${CI_KIALI_UPSTREAM_COMMIT}"
+RUN sed -i "s|REACT_APP_GIT_HASH=\$(git rev-parse HEAD)|${GIT_HASH}|g" package.json
+## Versions
+RUN yarn --version
+RUN node --version
+## Install
+
+RUN yarn install && yarn build
+
+
+## Move console to temporal
+RUN mv $REMOTE_SOURCE_DIR/app/frontend/build /tmp/console
+
+
+RUN rm -rf $REMOTE_SOURCE_DIR
+
+###########################################################################
+# GO BUILD      1.22                                                      #
+# https://brewweb.engineering.redhat.com/brew/packageinfo?packageID=70135 #
+###########################################################################
+
+#@follow_tag(registry-proxy.engineering.redhat.com/rh-osbs/openshift-golang-builder:rhel_8_golang_1.22)
+FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17 AS gobuilder
+
+ARG KIALI_VERSION
+ENV CGO_ENABLED=1
+ENV GOEXPERIMENT=strictfipsruntime
+
+# Copy remote source kiali server
+COPY $REMOTE_SOURCE $REMOTE_SOURCE_DIR
+WORKDIR $REMOTE_SOURCE_DIR/app
+RUN go version
+RUN go build -o /tmp/kiali-unstripped -ldflags "-X main.version=${KIALI_VERSION} -X main.commitHash=${CI_KIALI_UPSTREAM_COMMIT} -X main.goVersion=$(go version 2>/dev/null | grep -Eo  '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" -tags strictfipsruntime
+RUN strip -o /tmp/kiali -s /tmp/kiali-unstripped
+RUN rm -rf $REMOTE_SOURCE_DIR
+
+###########################################################################
+#  KIALI CONTAINER        build          								  #
+# https://catalog.redhat.com/software/containers/ubi8/5c647760bed8bd28d0e38f9f?tag=8.10-1054&container-tabs=gti&gti-tabs=registry-tokens  #
+###########################################################################
+
+#@follow_tag(registry.redhat.io/ubi8:8.10)
+FROM registry.redhat.io/ubi8:8.10-1088
+
+ARG KIALI_VERSION
+
+# component must match brew package name
+# name must match CDN repo name
+LABEL com.redhat.component="openshift-istio-kiali-rhel8-container" \
+      name="openshift-service-mesh/kiali-rhel8" \
+      summary="Kiali Service Mesh Observation" \
+      description="Microservices mesh observation tool for Openshift and Kubernetes" \
+      io.openshift.expose-services="20001:http" \
+      io.openshift.tags="monitoring" \
+      io.k8s.display-name="Kiali Service Mesh Observation" \
+      maintainer="Kiali Red Hat Team" \
+      version=$KIALI_VERSION
+
+ENV KIALI_CONTAINER_VERSION=$KIALI_VERSION
+
+WORKDIR /opt/kiali
+
+# Add kiali user and group
+RUN echo kiali:x:1000: >> /etc/group
+RUN echo kiali:x:1000:1000:/home/kiali:/sbin/nologin >> /etc/passwd
+
+COPY --from=uibuilder --chown=1000:1000 /tmp/console /opt/kiali/console
+COPY --from=gobuilder --chown=1000:1000 /tmp/kiali /opt/kiali/kiali
+
+EXPOSE 20001
+
+USER 1000
+
+ENTRYPOINT ["/opt/kiali/kiali"]
