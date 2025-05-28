@@ -82,12 +82,12 @@ func (n NoDestinationChecker) hasMatchingWorkload(host kubernetes.Host, subsetLa
 	// Covering 'servicename.namespace' host format scenario
 	localSvc, localNs := kubernetes.ParseTwoPartHost(host)
 
-	var selectors map[string]string
+	matchedService := false
 
 	// Find the correct service
 	for _, s := range n.RegistryServices {
 		if s.Attributes.Name == localSvc && s.Attributes.Namespace == localNs {
-			selectors = s.Attributes.LabelSelectors
+			matchedService = true
 			break
 		}
 	}
@@ -96,15 +96,11 @@ func (n NoDestinationChecker) hasMatchingWorkload(host kubernetes.Host, subsetLa
 	subsetSelector := labels.SelectorFromSet(subsetLabelSet)
 
 	// Check workloads
-	if len(selectors) != 0 {
-		selector := labels.SelectorFromSet(labels.Set(selectors))
-
+	if matchedService {
 		for _, w := range n.WorkloadsPerNamespace[localNs] {
 			wLabelSet := labels.Set(w.Labels)
-			if selector.Matches(wLabelSet) {
-				if subsetSelector.Matches(wLabelSet) {
-					return true
-				}
+			if subsetSelector.Matches(wLabelSet) {
+				return true
 			}
 		}
 	} else {

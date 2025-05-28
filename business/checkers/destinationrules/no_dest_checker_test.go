@@ -304,6 +304,53 @@ func TestNoMatchingSubsetWithMoreLabels(t *testing.T) {
 	assert.Equal("spec/subsets[0]", vals[0].Path)
 }
 
+func TestMatchingSubsetWithMoreLabels(t *testing.T) {
+	conf := config.NewConfig()
+	config.Set(conf)
+
+	assert := assert.New(t)
+
+	l1 := &map[string]string{
+		"app":                        "canary",
+		"rollouts-pod-template-hash": "hash1",
+	}
+
+	l2 := &map[string]string{
+		"app":                        "canary",
+		"rollouts-pod-template-hash": "hash2",
+	}
+
+	s1 := &api_networking_v1.Subset{
+		Name:   "canary-hash1",
+		Labels: *l1,
+	}
+	s2 := &api_networking_v1.Subset{
+		Name:   "canary-hash2",
+		Labels: *l2,
+	}
+	dr := data.AddSubsetToDestinationRule(s1,
+		data.AddSubsetToDestinationRule(s2, data.CreateEmptyDestinationRule("test-namespace", "name", "canary")))
+
+	vals, valid := NoDestinationChecker{
+		Conf: config.Get(),
+		WorkloadsPerNamespace: map[string]models.Workloads{
+			"test-namespace": {
+				data.CreateWorkload("canary-hash1", *l1),
+				data.CreateWorkload("canary-hash2", *l2)},
+		},
+		RegistryServices: data.CreateFakeRegistryServicesLabels("canary", "test-namespace"),
+		DestinationRule:  dr,
+		VirtualServices: []*networking_v1.VirtualService{data.AddHttpRoutesToVirtualService(data.CreateHttpRouteDestination("canary", "canary-hash1", 50),
+			data.AddHttpRoutesToVirtualService(data.CreateHttpRouteDestination("canary", "canary-hash2", 50),
+				data.CreateEmptyVirtualService("canary", "test-namespace", []string{"canary"}),
+			),
+		)},
+	}.Check()
+
+	assert.True(valid)
+	assert.Empty(vals)
+}
+
 func TestSubsetNotReferenced(t *testing.T) {
 	assert := assert.New(t)
 	conf := config.NewConfig()
