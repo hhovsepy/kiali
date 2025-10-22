@@ -3,7 +3,7 @@ module github.com/kiali/kiali
 go 1.24.2
 
 require (
-	github.com/Masterminds/semver/v3 v3.3.1
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/go-logr/zerologr v1.2.3
