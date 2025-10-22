@@ -10353,10 +10353,10 @@ react-fast-compare@^3.0.1, react-fast-compare@^3.2.0:
   resolved "https://registry.yarnpkg.com/react-fast-compare/-/react-fast-compare-3.2.2.tgz#929a97a532304ce9fee4bcae44234f1ce2c21d49"
   integrity sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==
 
-react-flexview@4.0.3:
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/react-flexview/-/react-flexview-4.0.3.tgz#e2945fc7c79ebdd9d96379785193094e2823e824"
-  integrity sha512-DSmNsk7leUfkDlAEZjVk/khzAkX3Tbl4p5PJz4S13sTJdqSrs60FKjzDwtwsTO2dT0bSVGW0LetbTfm3I2EULg==
+react-flexview@4.0.4:
+  version "4.0.4"
+  resolved "https://registry.yarnpkg.com/react-flexview/-/react-flexview-4.0.4.tgz#71dd3b7d1385c680720694becc80666260f6d5da"
+  integrity sha512-vclPtC4EjNnagEuC3KSXyr8YPtNE0gwxqO8CtJ4IsWe+eVtzetm6d0eNQ2cL+Ws7b/FazlieyoPGBGlBPvuTpw==
   dependencies:
     prop-types "^15.5.6"
 
