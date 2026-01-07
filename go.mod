@@ -6,11 +6,12 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-jose/go-jose/v4 v4.1.2
+	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/go-logr/zerologr v1.2.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nitishm/engarde v0.1.1
@@ -68,7 +69,6 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20250923004556-9e5a51aed1e8 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -97,7 +97,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/mod v0.28.0 // indirect
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
