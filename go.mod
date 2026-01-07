@@ -11,6 +11,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nitishm/engarde v0.1.1
@@ -45,7 +46,7 @@ require (
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
 	sigs.k8s.io/controller-runtime v0.22.3
-	sigs.k8s.io/gateway-api v1.4.0
+	sigs.k8s.io/gateway-api v1.4.1
 	sigs.k8s.io/gateway-api-inference-extension v1.1.0
 )
 
@@ -68,7 +69,6 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20250923004556-9e5a51aed1e8 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
