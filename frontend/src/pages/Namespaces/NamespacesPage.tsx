@@ -45,6 +45,7 @@ import { isParentKiosk, kioskOverviewAction as kioskAction } from '../../compone
 import { store } from '../../store/ConfigStore';
 import { setAIContext } from 'helpers/ChatAI';
 import { KialiDispatch } from 'types/Redux';
+import { t } from 'utils/I18nUtils';
 import { NamespaceTrafficPolicies } from './NamespaceTrafficPolicies';
 import { ControlPlane } from '../../types/Mesh';
 import { GrafanaInfo, ISTIO_DASHBOARDS } from '../../types/GrafanaInfo';
@@ -266,10 +267,7 @@ export class NamespacesPageComponent extends React.Component<NamespacesProps, St
             this.fetchTLS(isAscending, sortField);
             this.fetchValidations(isAscending, sortField);
 
-            setAIContext(
-              this.props.dispatch,
-              `Namespaces list: ${this.state.namespaces.map(ns => ns.name).join(',')}`
-            );
+            setAIContext(this.props.dispatch, `Namespaces list: ${this.state.namespaces.map(ns => ns.name).join(',')}`);
             this.fetchControlPlanes();
           }
         );
