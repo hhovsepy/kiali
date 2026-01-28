@@ -34,7 +34,15 @@ jest.mock('../../../app/History', () => ({
   },
   router: {
     navigate: jest.fn()
-  }
+  },
+  webRoot: '/'
+}));
+
+jest.mock('../../../utils/I18nUtils', () => ({
+  t: (key: string) => key,
+  useKialiTranslation: () => ({
+    t: (key: string) => key
+  })
 }));
 
 const mockNamespaces: NamespaceInfo[] = [
@@ -67,7 +75,8 @@ const defaultReduxProps = {
   meshStatus: 'MTLS_ENABLED',
   minTLS: 'TLS_AUTO',
   navCollapse: false,
-  refreshInterval: 15000 as IntervalInMilliseconds
+  refreshInterval: 15000 as IntervalInMilliseconds,
+  dispatch: jest.fn()
 };
 
 const defaultProps = {
