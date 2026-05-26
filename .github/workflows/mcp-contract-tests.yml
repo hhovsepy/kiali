@@ -71,7 +71,7 @@ jobs:
       (github.event.issue.pull_request &&
        contains(github.event.comment.body, '/mcp-contract-tests'))
     outputs:
-      should-run: ${{ steps.check.outputs.should_run }}
+      should_run: ${{ steps.check.outputs.should_run }}
       target_branch: ${{ steps.check.outputs.target_branch }}
       build_branch: ${{ steps.check.outputs.build_branch }}
       kubernetes_mcp_server_ref: ${{ steps.check.outputs.kubernetes_mcp_server_ref }}
@@ -112,7 +112,7 @@ jobs:
   mcp_contract_tests:
     name: MCP Contract Tests
     needs: [check-trigger]
-    if: needs.check-trigger.outputs.should-run == 'true'
+    if: needs.check-trigger.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     env:
       TARGET_BRANCH: ${{ needs.check-trigger.outputs.target_branch }}
