@@ -389,12 +389,15 @@ export function cleanSleepMtlsTestResources(): void {
   waitForResourceDeleted('kubectl get PeerAuthentication default -n sleep', cleanupTimeoutMs);
 }
 
-/** Mirrors Cypress `@clean-istio-namespace-resources-after` hook. */
-export function cleanIstioSystemTestResources(): void {
+/** Mirrors Cypress `@clean-istio-namespace-resources-after` hook (restart optional). */
+export function cleanIstioSystemTestResources(restartDeployments = false): void {
   kubectlDelete('PeerAuthentication default -n istio-system');
   kubectlDelete('Sidecar default -n istio-system');
   waitForResourceDeleted('kubectl get PeerAuthentication default -n istio-system');
   waitForResourceDeleted('kubectl get Sidecar default -n istio-system');
+  if (!restartDeployments) {
+    return;
+  }
   kubectlExec('kubectl rollout restart deployment -n alpha', false);
   kubectlExec('kubectl rollout restart deployment -n beta', false);
   kubectlExec('kubectl rollout status deployment -n alpha --timeout=60s', false);

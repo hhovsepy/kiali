@@ -42,7 +42,7 @@ test.describe('Istio Config CRD validation', () => {
 
   test.afterAll(() => {
     cleanSleepMtlsTestResources();
-    cleanIstioSystemTestResources();
+    cleanIstioSystemTestResources(true);
   });
 
   test.describe('parallel', () => {
@@ -424,6 +424,8 @@ test.describe('Istio Config CRD validation', () => {
   test.describe('mTLS contention', () => {
     test.describe.configure({ mode: 'serial' });
 
+    const istioSystemCleanupAfterTests = ['KIA0208 validation', 'KIA0506 validation', 'KIA1006 validation'];
+
     test.beforeAll(() => {
       ensureDemoApp('bookinfo');
       ensureDemoApp('sleep');
@@ -431,12 +433,13 @@ test.describe('Istio Config CRD validation', () => {
 
     test.beforeEach(() => {
       cleanSleepMtlsTestResources();
-      cleanIstioSystemTestResources();
+      cleanIstioSystemTestResources(false);
     });
 
-    test.afterEach(() => {
+    test.afterEach((_fixtures, testInfo) => {
       cleanSleepMtlsTestResources();
-      cleanIstioSystemTestResources();
+      const restartDeployments = istioSystemCleanupAfterTests.includes(testInfo.title);
+      cleanIstioSystemTestResources(restartDeployments);
     });
 
     test('KIA0207 validation', crdValidationOnly, async ({ istioConfigPage, page }, testInfo) => {
@@ -473,8 +476,10 @@ test.describe('Istio Config CRD validation', () => {
       patchPeerAuthenticationMtlsMode('default', 'istio-system', 'STRICT');
 
       await istioConfigPage.open();
+      await selectNamespace(page, 'istio-system');
+      await istioConfigPage.primeValidationFromDetails('istio-system', 'PeerAuthentication', 'default');
       await selectNamespace(page, 'sleep');
-      await istioConfigPage.expectValidationStatus('sleep', 'DestinationRule', drName, 'danger');
+      await istioConfigPage.expectValidationOnDetailsPage('sleep', 'DestinationRule', drName, 'KIA0208');
       deleteIstioConfig('DestinationRule', drName, 'sleep');
     });
 
