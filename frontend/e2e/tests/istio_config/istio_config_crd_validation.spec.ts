@@ -436,7 +436,8 @@ test.describe('Istio Config CRD validation', () => {
       cleanIstioSystemTestResources(false);
     });
 
-    test.afterEach((_fixtures, testInfo) => {
+    test.afterEach(async ({ page }, testInfo) => {
+      void page;
       cleanSleepMtlsTestResources();
       const restartDeployments = istioSystemCleanupAfterTests.includes(testInfo.title);
       cleanIstioSystemTestResources(restartDeployments);
