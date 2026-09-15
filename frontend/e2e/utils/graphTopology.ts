@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import { waitForLoadingComplete } from './transition';
+
 export type TopologyNode = {
   data: Record<string, unknown>;
   id: string;
@@ -294,11 +296,18 @@ export async function expectMiniGraphReady(page: Page): Promise<void> {
   await expect(miniGraph).toBeVisible();
 
   // Cypress assertMiniGraphReady polls until MiniGraphCardComponent is ready and has nodes.
+  // On failure, click the page refresh button to re-fetch graph data (passive polling alone is not enough in CI).
   await expect(async () => {
-    await expect(page.locator('#MiniGraphCard[data-ready="true"]')).toBeVisible({ timeout: 5_000 });
-    const topology = await readMiniGraphTopology(page);
-    expect(topology.nodes.length).toBeGreaterThan(0);
-  }).toPass({ intervals: [3_000], timeout: 120_000 });
+    try {
+      await expect(page.locator('#MiniGraphCard[data-ready="true"]')).toBeVisible({ timeout: 5_000 });
+      const topology = await readMiniGraphTopology(page);
+      expect(topology.nodes.length).toBeGreaterThan(0);
+    } catch {
+      await page.getByTestId('refresh-button').click();
+      await waitForLoadingComplete(page);
+      throw new Error('mini graph not ready yet');
+    }
+  }).toPass({ intervals: [10_000], timeout: 90_000 });
 }
 
 export async function expectGraphTopology(page: Page, assertFn: (topology: GraphTopology) => void): Promise<void> {
