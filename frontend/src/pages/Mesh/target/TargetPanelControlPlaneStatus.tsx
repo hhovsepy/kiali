@@ -1,11 +1,26 @@
-import { Tooltip, TooltipPosition, Label } from '@patternfly/react-core';
+import { Label, Tooltip, TooltipPosition } from '@patternfly/react-core';
+import { KialiIcon } from 'config/KialiIcon';
 import * as React from 'react';
-import { OutboundTrafficPolicy } from 'types/IstioObjects';
+import { PFSpacer } from 'styles/PfSpacer';
+import { kialiStyle } from 'styles/StyleUtils';
+import type { MeshDefaultTrafficPolicy, OutboundTrafficPolicy } from 'types/IstioObjects';
+import type { ControlPlaneMetricsMap } from 'types/Metrics';
 import { useKialiTranslation } from 'utils/I18nUtils';
-import { ControlPlaneMetricsMap } from 'types/Metrics';
+import { defaultTrafficPolicySummary, isDefaultTrafficPolicyConfigured } from './defaultTrafficPolicyLabel';
+import { controlPlaneStatusLabelStyle, controlPlaneStatusStyle } from './TargetPanelCommon';
+
+const statusRowStyle = kialiStyle({
+  alignItems: 'center',
+  display: 'flex',
+  gap: PFSpacer.xs
+});
+
+const lockIconStyle = kialiStyle({ marginLeft: '0.25rem' });
 
 type Props = {
   controlPlaneMetrics?: ControlPlaneMetricsMap;
+  defaultTrafficPolicy?: MeshDefaultTrafficPolicy;
+  minTLS?: string;
   outboundTrafficPolicy?: OutboundTrafficPolicy;
 };
 
@@ -18,12 +33,35 @@ export const TargetPanelControlPlaneStatus: React.FC<Props> = (props: Props) => 
       ? proxyTime[0].datapoints.reduce((a, b) => (a[1] < b[1] ? a : b))[1] * 1000
       : undefined;
   const proxySyncTimeStr = !proxySyncTime || isNaN(proxySyncTime) ? 'N/A' : `${proxySyncTime.toFixed(2)}ms`;
+  const defaultTrafficPolicy = isDefaultTrafficPolicyConfigured(props.defaultTrafficPolicy)
+    ? props.defaultTrafficPolicy
+    : undefined;
 
   return (
-    <div style={{ textAlign: 'left' }}>
+    <div className={controlPlaneStatusStyle}>
+      {defaultTrafficPolicy && (
+        <div className={statusRowStyle}>
+          <div className={controlPlaneStatusLabelStyle}>{t('Default traffic policy')}</div>
+          <Tooltip
+            position={TooltipPosition.right}
+            content={
+              <div style={{ textAlign: 'left' }}>
+                {t(
+                  `This shows meshConfig.defaultTrafficPolicy. DestinationRules inherit these baseline connection pool and \
+outlier detection settings unless they define their own trafficPolicy.`
+                )}
+              </div>
+            }
+          >
+            <Label isCompact color="blue" data-test="mesh-default-traffic-policy">
+              {defaultTrafficPolicySummary(defaultTrafficPolicy)}
+            </Label>
+          </Tooltip>
+        </div>
+      )}
       {props.outboundTrafficPolicy && (
-        <div>
-          <div style={{ display: 'inline-block', width: '125px', whiteSpace: 'nowrap' }}>{t('Outbound policy')}</div>
+        <div className={statusRowStyle}>
+          <div className={controlPlaneStatusLabelStyle}>{t('Outbound policy')}</div>
           <Tooltip
             position={TooltipPosition.right}
             content={
@@ -41,8 +79,8 @@ export const TargetPanelControlPlaneStatus: React.FC<Props> = (props: Props) => 
           </Tooltip>
         </div>
       )}
-      <div>
-        <div style={{ display: 'inline-block', width: '125px', whiteSpace: 'nowrap' }}>{t('Proxy sync time')}</div>
+      <div className={statusRowStyle}>
+        <div className={controlPlaneStatusLabelStyle}>{t('Proxy sync time')}</div>
         <Tooltip
           position={TooltipPosition.right}
           content={
@@ -57,6 +95,27 @@ export const TargetPanelControlPlaneStatus: React.FC<Props> = (props: Props) => 
           </Label>
         </Tooltip>
       </div>
+      {props.minTLS && (
+        <div className={statusRowStyle}>
+          <div className={controlPlaneStatusLabelStyle}>{t('Min TLS version')}</div>
+          <Tooltip
+            position={TooltipPosition.right}
+            content={
+              <div style={{ textAlign: 'left' }}>
+                {t(
+                  `The minimum TLS version for connections among Istio workloads. Defaults to TLSV1_2 if not set. Set by the 'meshConfig.meshMTLS.minProtocolVersion' field.`
+                )}
+              </div>
+            }
+          >
+            <Label isCompact color="blue" data-test="label-TLS">
+              <div style={{ display: '-webkit-box' }}>
+                {props.minTLS} <KialiIcon.MtlsLock className={lockIconStyle} />
+              </div>
+            </Label>
+          </Tooltip>
+        </div>
+      )}
     </div>
   );
 };

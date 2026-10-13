@@ -49,6 +49,10 @@ func parseIstioConfigMap(istioConfig *corev1.ConfigMap, into *models.MeshConfigM
 		log.Warningf("parseIstioConfigMap: Cannot read Istio mesh configuration.")
 		return err
 	}
+	// defaultTrafficPolicy is not in our istio.io/api MeshConfig yet; preserve it for the mesh API and UI.
+	if err := applyDefaultTrafficPolicyFromMeshYAML(meshConfigYaml, into.Mesh); err != nil {
+		return err
+	}
 
 	return parseMeshNetworks(istioConfig, into)
 }
@@ -77,6 +81,21 @@ func parseMeshConfigFile(meshConfigYAML string, into *models.MeshConfigMap) erro
 	if err := k8syaml.Unmarshal([]byte(meshConfigYAML), into.Mesh); err != nil {
 		return fmt.Errorf("unable to parse Istio mesh configuration file: %w", err)
 	}
+	if err := applyDefaultTrafficPolicyFromMeshYAML(meshConfigYAML, into.Mesh); err != nil {
+		return fmt.Errorf("unable to parse Istio mesh defaultTrafficPolicy: %w", err)
+	}
+	return nil
+}
+
+func applyDefaultTrafficPolicyFromMeshYAML(meshConfigYAML string, mesh *models.MeshConfig) error {
+	if mesh == nil {
+		return nil
+	}
+	policy, err := models.ParseDefaultTrafficPolicyFromYAML(meshConfigYAML)
+	if err != nil {
+		return err
+	}
+	mesh.DefaultTrafficPolicy = policy
 	return nil
 }
 

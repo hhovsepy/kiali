@@ -246,15 +246,54 @@ func NewMeshConfig() *MeshConfig {
 // MeshConfig wraps the istio.MeshConfig solely to override json Marshaling
 // for some fields. See MarshalJSON for more details.
 type MeshConfig struct {
+	DefaultTrafficPolicy *MeshDefaultTrafficPolicy `json:"defaultTrafficPolicy,omitempty"`
 	*istiov1alpha1.MeshConfig
+}
+
+// UnmarshalJSON unmarshals the istio MeshConfig proto and extension fields not yet in our istio.io/api version.
+func (m *MeshConfig) UnmarshalJSON(b []byte) error {
+	if m.MeshConfig == nil {
+		m.MeshConfig = &istiov1alpha1.MeshConfig{}
+	}
+	if err := m.MeshConfig.UnmarshalJSON(b); err != nil {
+		return err
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	dtp, ok := raw["defaultTrafficPolicy"]
+	if !ok {
+		m.DefaultTrafficPolicy = nil
+		return nil
+	}
+	policy := &MeshDefaultTrafficPolicy{}
+	if err := json.Unmarshal(dtp, policy); err != nil {
+		return err
+	}
+	if !policy.IsConfigured() {
+		m.DefaultTrafficPolicy = nil
+		return nil
+	}
+	m.DefaultTrafficPolicy = policy
+	return nil
 }
 
 // MarshalJSON we're overriding the default Marshaling because of this issue:
 // https://github.com/istio/istio/issues/43657.
 func (m MeshConfig) MarshalJSON() ([]byte, error) {
-	// Don't do custom unmarhsaling if OutboundTrafficPolicy is not set.
-	// There are probably other fields like this but only handling this one for now.
-	if m.OutboundTrafficPolicy == nil {
+	hasDefaultTrafficPolicy := m.DefaultTrafficPolicy != nil && m.DefaultTrafficPolicy.IsConfigured()
+	if m.MeshConfig == nil {
+		if !hasDefaultTrafficPolicy {
+			return json.Marshal(map[string]any{})
+		}
+		var meshUnstructured map[string]any
+		return marshalMeshExtensions(meshUnstructured, m)
+	}
+
+	// Don't do custom marshaling unless we need to fix or add fields missing from the proto JSON.
+	if m.OutboundTrafficPolicy == nil && !hasDefaultTrafficPolicy {
 		return m.MeshConfig.MarshalJSON()
 	}
 
@@ -273,14 +312,34 @@ func (m MeshConfig) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	if _, ok := meshUnstructured["outboundTrafficPolicy"]; ok {
-		meshUnstructured["outboundTrafficPolicy"] = struct {
-			Mode string `json:"mode"`
-		}{
-			Mode: istiov1alpha1.MeshConfig_OutboundTrafficPolicy_Mode_name[int32(m.OutboundTrafficPolicy.Mode)],
+	if m.OutboundTrafficPolicy != nil {
+		if _, ok := meshUnstructured["outboundTrafficPolicy"]; ok {
+			meshUnstructured["outboundTrafficPolicy"] = struct {
+				Mode string `json:"mode"`
+			}{
+				Mode: istiov1alpha1.MeshConfig_OutboundTrafficPolicy_Mode_name[int32(m.OutboundTrafficPolicy.Mode)],
+			}
 		}
 	}
 
+	return marshalMeshExtensions(meshUnstructured, m)
+}
+
+func marshalMeshExtensions(meshUnstructured map[string]any, m MeshConfig) ([]byte, error) {
+	if meshUnstructured == nil {
+		meshUnstructured = map[string]any{}
+	}
+	if m.DefaultTrafficPolicy != nil && m.DefaultTrafficPolicy.IsConfigured() {
+		dtpJSON, err := json.Marshal(m.DefaultTrafficPolicy)
+		if err != nil {
+			return nil, err
+		}
+		var dtp map[string]any
+		if err := json.Unmarshal(dtpJSON, &dtp); err != nil {
+			return nil, err
+		}
+		meshUnstructured["defaultTrafficPolicy"] = dtp
+	}
 	return json.Marshal(meshUnstructured)
 }
 

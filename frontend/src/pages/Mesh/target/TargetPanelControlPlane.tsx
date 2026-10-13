@@ -16,7 +16,6 @@ import { serverConfig } from 'config';
 import type { NamespaceInfo, NamespaceStatus } from 'types/NamespaceInfo';
 import type { DirectionType } from 'types/Common';
 import { PromisesRegistry } from 'utils/CancelablePromises';
-import { TLSInfo } from 'components/Overview/TLSInfo';
 import * as API from '../../../services/Api';
 import type { IstioMetricsOptions } from 'types/MetricsOptions';
 import { buildReporter } from 'types/MetricsOptions';
@@ -251,13 +250,13 @@ export class TargetPanelControlPlane extends React.Component<
 
           <TargetPanelControlPlaneStatus
             controlPlaneMetrics={this.state.controlPlaneMetrics}
+            defaultTrafficPolicy={controlPlane.config.effectiveConfig?.configMap?.mesh?.defaultTrafficPolicy}
+            minTLS={this.props.minTLS}
             outboundTrafficPolicy={
               controlPlane.config.effectiveConfig?.configMap?.mesh?.outboundTrafficPolicy ||
               defaultOutboundTrafficPolicy
             }
           />
-
-          <TLSInfo version={this.props.minTLS} />
 
           {!isRemoteCluster(nsInfo.annotations) && (
             <>

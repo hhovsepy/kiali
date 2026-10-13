@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { kialiStyle } from 'styles/StyleUtils';
 import { PFColors } from 'components/Pf/PfColors';
-import { MeshAttr, MeshInfraType, MeshNodeData, MeshTarget } from 'types/Mesh';
-import { DurationInSeconds, IntervalInMilliseconds, TimeInMilliseconds } from 'types/Common';
+import { MeshAttr, MeshInfraType, type MeshNodeData, type MeshTarget } from 'types/Mesh';
+import type { DurationInSeconds, IntervalInMilliseconds, TimeInMilliseconds } from 'types/Common';
 import { ValidationTypes } from 'types/IstioObjects';
 import { Status, statusMsg } from 'types/IstioStatus';
 import { Validation } from 'components/Validations/Validation';
@@ -10,15 +10,15 @@ import { Title, Tooltip, TooltipPosition, SearchInput, Tabs, Tab, TabTitleText }
 import { ExpandableRowContent, Table, Tbody, Td, Tr } from '@patternfly/react-table';
 import { t, useKialiTranslation } from 'utils/I18nUtils';
 import { KialiLink } from 'components/Link/KialiLink';
-import { PFBadge, PFBadges, PFBadgeType } from 'components/Pf/PfBadges';
+import { PFBadge, PFBadges, type PFBadgeType } from 'components/Pf/PfBadges';
 import { AmbientLabel, tooltipMsgType } from '../../../components/Ambient/AmbientLabel';
 import { serverConfig } from '../../../config';
 import { KialiPageLink } from 'components/Link/KialiPageLink';
 import { classes } from 'typestyle';
 import { UNKNOWN } from 'types/Graph';
 import { elems, selectAnd } from 'helpers/GraphHelpers';
-import { Controller, Node } from '@patternfly/react-topology';
-import { MeshData } from '../MeshPage';
+import type { Controller, Node } from '@patternfly/react-topology';
+import type { MeshData } from '../MeshPage';
 import { panelHeadingStyle } from '../../Graph/SummaryPanelStyle';
 import { getNamespaceDetailUrl } from 'utils/NamespaceUtils';
 
@@ -69,6 +69,15 @@ export const summaryTitle = kialiStyle({
   marginTop: '0.25rem',
   marginBottom: '0.25rem',
   textAlign: 'left'
+});
+
+// Compact label/value rows for control-plane status (outbound policy, TLS, etc.).
+export const controlPlaneStatusStyle = kialiStyle({
+  textAlign: 'left'
+});
+
+export const controlPlaneStatusLabelStyle = kialiStyle({
+  whiteSpace: 'nowrap'
 });
 
 export const getMeshId = (nodeData: MeshNodeData): string => {
@@ -270,7 +279,7 @@ export const renderNodeLink = (meshData: MeshNodeData, style?: string): React.Re
   let pfBadge: PFBadgeType;
 
   switch (meshData.infraType) {
-    case MeshInfraType.GATEWAY:
+    case MeshInfraType.GATEWAY: {
       const gatewayClassName = meshData.infraData?.spec?.gatewayClassName;
       const name = gatewayClassName ? `${meshData.infraName}-${gatewayClassName}` : meshData.infraName;
       link = `/namespaces/${encodeURIComponent(meshData.namespace)}/workloads/${encodeURIComponent(name)}`;
@@ -278,6 +287,7 @@ export const renderNodeLink = (meshData: MeshNodeData, style?: string): React.Re
       displayName = name;
       pfBadge = PFBadges.Workload;
       break;
+    }
     case MeshInfraType.WAYPOINT:
     case MeshInfraType.ZTUNNEL:
     case MeshInfraType.KIALI:

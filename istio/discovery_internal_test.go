@@ -78,6 +78,34 @@ discoverySelectors:
 	assert.Equal("mazzkey2", data.Mesh.DiscoverySelectors[1].MatchExpressions[1].Key)
 }
 
+func TestParseIstioConfigMap_DefaultTrafficPolicy(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	meshYaml := `
+defaultTrafficPolicy:
+  connectionPool:
+    tcp:
+      maxConnections: 100
+  outlierDetection:
+    consecutiveErrors: 3
+`
+	cm := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "istio"},
+		Data:       map[string]string{"mesh": meshYaml},
+	}
+
+	data := &models.MeshConfigMap{}
+	err := parseIstioConfigMap(&cm, data)
+	require.NoError(err)
+	require.NotNil(data.Mesh.DefaultTrafficPolicy)
+	require.NotNil(data.Mesh.DefaultTrafficPolicy.ConnectionPool)
+	require.NotNil(data.Mesh.DefaultTrafficPolicy.ConnectionPool.Tcp)
+	assert.EqualValues(100, data.Mesh.DefaultTrafficPolicy.ConnectionPool.Tcp.MaxConnections)
+	require.NotNil(data.Mesh.DefaultTrafficPolicy.OutlierDetection)
+	assert.EqualValues(3, data.Mesh.DefaultTrafficPolicy.OutlierDetection.ConsecutiveErrors)
+}
+
 func TestIstioConfigMapName(t *testing.T) {
 	testCases := map[string]struct {
 		configMap *corev1.ConfigMap

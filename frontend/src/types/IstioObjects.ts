@@ -1071,6 +1071,12 @@ export interface OutboundTrafficPolicy {
   mode?: string;
 }
 
+// Istio 1.31+ meshConfig.defaultTrafficPolicy baseline inherited by DestinationRules.
+export interface MeshDefaultTrafficPolicy {
+  connectionPool?: ConnectionPoolSettings;
+  outlierDetection?: OutlierDetection;
+}
+
 // 1.6
 export interface Localhost {
   clientTls?: ClientTLSSettings;
