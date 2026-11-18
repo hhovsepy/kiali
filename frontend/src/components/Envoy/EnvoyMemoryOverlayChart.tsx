@@ -43,6 +43,8 @@ import { flexFillStyle, noShrinkStyle } from 'styles/FlexStyles';
 import { classes } from 'typestyle';
 
 type EnvoyMemoryOverlayChartProps = {
+  busyRequestRatePerSecond?: number;
+  isL4Proxy?: boolean;
   isMaximized: boolean;
   lastRefreshAt: TimeInMilliseconds;
   memoryLimitBytes?: number;
@@ -138,13 +140,16 @@ const seriesName = (line: { datapoints: VCDataPoint[]; legendItem?: { name?: str
 // prefer the TCP opened/closed net when positive; Envoy cx gauges are only
 // trusted when HTTP is busy (at or above the busy request rate) or when TCP
 // telemetry is absent, so the chart cannot disagree with the summary tile.
-// The HTTP rate comes from the dashboard's "Request rate" chart; when that
-// chart is absent the rate reads as 0, matching the backend's behavior when
-// istio_requests_total is missing.
+// The busy threshold and the L4-proxy flag come from the summary
+// (busyRequestRatePerSecond, trafficIsByteRate) so a configured backend
+// threshold is honored. The HTTP rate comes from the dashboard's
+// "Request rate" chart; when that chart is absent the rate reads as 0,
+// matching the backend's behavior when istio_requests_total is missing.
 const activeConnectionsDatapoints = (
   lines: { datapoints: VCDataPoint[]; legendItem?: { name?: string } }[],
   requestRateLines: { datapoints: VCDataPoint[]; legendItem?: { name?: string } }[],
-  isWaypointProxy: boolean,
+  isL4Proxy: boolean,
+  busyRequestRatePerSecond: number,
   name: string
 ): VCDataPoint[] => {
   const opened = lines.filter(line => /tcp.*opened|opened.*tcp/i.test(seriesName(line)));
@@ -198,7 +203,7 @@ const activeConnectionsDatapoints = (
       const tcpActive = (openedByTime.get(x) ?? 0) - (closedByTime.get(x) ?? 0);
       const envoyActive = envoyCxByTime.get(x) ?? 0;
       const httpRate = Math.max(valueAtOrBefore(requestUpstreamByTime, x), valueAtOrBefore(requestDownstreamByTime, x));
-      const httpBusy = !isWaypointProxy && httpRate >= BUSY_REQUEST_RATE_PER_SECOND;
+      const httpBusy = !isL4Proxy && httpRate >= busyRequestRatePerSecond;
       let active = 0;
       if (tcpObserved && tcpActive > 0) {
         active = tcpActive;
@@ -452,7 +457,8 @@ export const EnvoyMemoryOverlayChart: React.FC<EnvoyMemoryOverlayChartProps> = (
     const active = activeConnectionsDatapoints(
       connectionLines,
       requestRateLines,
-      props.workload.isWaypoint ?? false,
+      props.isL4Proxy ?? props.workload.isWaypoint ?? false,
+      props.busyRequestRatePerSecond ?? BUSY_REQUEST_RATE_PER_SECOND,
       connectionsSeriesName
     );
     if (active.length > 0) {

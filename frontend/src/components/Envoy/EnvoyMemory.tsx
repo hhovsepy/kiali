@@ -391,6 +391,8 @@ export const EnvoyMemory: React.FC<EnvoyMemoryProps> = (props: EnvoyMemoryProps)
 
           <div className={isChartMaximized ? maximizedSectionStyle : sectionStyle}>
             <EnvoyMemoryOverlayChart
+              busyRequestRatePerSecond={summary?.busyRequestRatePerSecond}
+              isL4Proxy={summary?.trafficIsByteRate}
               isMaximized={isChartMaximized}
               lastRefreshAt={props.lastRefreshAt}
               memoryLimitBytes={
