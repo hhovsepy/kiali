@@ -172,6 +172,18 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 		workingSetMetric,
 		memoryLimits,
 	)
+	// Report the workload-wide max limit when the selected pod has none, so a
+	// limit set on a sibling pod stays visible in the summary and the chart.
+	workloadLimitBytes := 0.0
+	for _, limit := range memoryLimits {
+		if limit > workloadLimitBytes {
+			workloadLimitBytes = limit
+		}
+	}
+	limitBytes := memory.LimitBytes
+	if limitBytes == 0 {
+		limitBytes = workloadLimitBytes
+	}
 	statusAt := memory.PeakAt
 	activeClustersMax, requestRate, trafficIsByteRate, activeConnections, connectionsObserved :=
 		envoyMemoryStatusTrafficSignals(
@@ -206,18 +218,21 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 	)
 
 	var memoryUsedPercent float64
-	if memory.LimitBytes > 0 {
-		memoryUsedPercent = (memory.MaxBytes / memory.LimitBytes) * 100
+	if limitBytes > 0 {
+		memoryUsedPercent = (memory.MaxBytes / limitBytes) * 100
 	}
 
 	return &models.EnvoyMemorySummary{
 		ActiveClustersMax:            activeClustersMax,
 		ActiveConnections:            activeConnections,
 		ActiveConnectionsObserved:    connectionsObserved,
+		BusyActiveConnections:        busyActiveConnections,
+		BusyRequestRatePerSecond:     busyRequestRatePerSecond,
+		BusyTCPBytesPerSecond:        busyTCPBytesPerSecond,
 		Cause:                        cause,
 		ConfigCountsPod:              memory.Pod,
 		LargeConfigClustersThreshold: largeConfigClusters,
-		MemoryLimitBytes:             int64(memory.LimitBytes),
+		MemoryLimitBytes:             int64(limitBytes),
 		MemoryMaxBytes:               int64(memory.MaxBytes),
 		MemoryMetric:                 memory.Metric,
 		MemoryThresholdBytes:         int64(memory.ThresholdBytes),
@@ -330,48 +345,60 @@ type envoyMemorySelection struct {
 }
 
 type podPeakSample struct {
-	at    model.Time
-	value float64
+	at     model.Time
+	metric models.EnvoyMemoryMetric
+	value  float64
 }
 
 // selectEnvoyStatusMemory prefers the istio-proxy cgroup working set because it
-// remains available when Istio filters Envoy stats. Envoy allocated memory is a
-// fallback and uses the absolute threshold because it is not total cgroup usage.
+// remains available when Istio filters Envoy stats. The fallback to Envoy
+// allocated memory is per pod: a kubelet scrape gap can leave working set
+// missing for individual pods while other pods of the workload report it.
 func selectEnvoyStatusMemory(
 	absoluteThreshold float64,
 	allocatedMetric prometheus.Metric,
 	workingSetMetric prometheus.Metric,
 	memoryLimits map[string]float64,
 ) envoyMemorySelection {
-	workingSetByPod := peakSamplesByPod(workingSetMetric)
-	if len(workingSetByPod) > 0 {
-		return selectHighestMemoryPressure(workingSetByPod, memoryLimits, absoluteThreshold, models.EnvoyMemoryMetricWorkingSet)
+	peaksByPod := peakSamplesByPod(workingSetMetric, models.EnvoyMemoryMetricWorkingSet)
+	for pod, peak := range peakSamplesByPod(allocatedMetric, models.EnvoyMemoryMetricAllocated) {
+		if _, ok := peaksByPod[pod]; !ok {
+			peaksByPod[pod] = peak
+		}
 	}
 
-	return selectHighestMemoryPressure(peakSamplesByPod(allocatedMetric), memoryLimits, absoluteThreshold, models.EnvoyMemoryMetricAllocated)
+	return selectHighestMemoryPressure(peaksByPod, memoryLimits, absoluteThreshold)
 }
 
-func selectHighestMemoryPressure(peaksByPod map[string]podPeakSample, memoryLimits map[string]float64, absoluteThreshold float64, metric models.EnvoyMemoryMetric) envoyMemorySelection {
-	selection := envoyMemorySelection{Metric: metric, ThresholdBytes: absoluteThreshold}
+// selectHighestMemoryPressure picks the pod with the highest memory pressure
+// (peak value relative to its threshold). Pods are visited in name order so
+// equal-pressure ties resolve deterministically instead of by map iteration
+// order.
+func selectHighestMemoryPressure(peaksByPod map[string]podPeakSample, memoryLimits map[string]float64, absoluteThreshold float64) envoyMemorySelection {
+	selection := envoyMemorySelection{Metric: models.EnvoyMemoryMetricAllocated, ThresholdBytes: absoluteThreshold}
+	pods := make([]string, 0, len(peaksByPod))
+	for pod := range peaksByPod {
+		pods = append(pods, pod)
+	}
+	sort.Strings(pods)
+
 	bestPressure := 0.0
-	for pod, peak := range peaksByPod {
+	for _, pod := range pods {
+		peak := peaksByPod[pod]
 		limit := memoryLimits[pod]
-		threshold := absoluteThreshold
-		if metric == models.EnvoyMemoryMetricWorkingSet {
-			threshold = computeEnvoyMemoryThreshold(absoluteThreshold, limit)
-		}
+		threshold := computeEnvoyMemoryThreshold(absoluteThreshold, limit)
 		pressure := peak.value / threshold
 		if pressure < bestPressure {
 			continue
 		}
-		if pressure == bestPressure && peak.at < selection.PeakAt {
+		if pressure == bestPressure && peak.at <= selection.PeakAt {
 			continue
 		}
 		bestPressure = pressure
 		selection = envoyMemorySelection{
 			LimitBytes:     limit,
 			MaxBytes:       peak.value,
-			Metric:         metric,
+			Metric:         peak.metric,
 			PeakAt:         peak.at,
 			Pod:            pod,
 			ThresholdBytes: threshold,
@@ -589,23 +616,9 @@ func buildIstioWorkloadLabels(namespace, workloadName, prefix string, conf *conf
 	return lb.Build()
 }
 
-func maxLatestValue(metric prometheus.Metric) float64 {
-	max := 0.0
-	for _, stream := range metric.Matrix {
-		if len(stream.Values) == 0 {
-			continue
-		}
-		value := float64(stream.Values[len(stream.Values)-1].Value)
-		if value > max {
-			max = value
-		}
-	}
-	return max
-}
-
 // peakSamplesByPod keeps the peak sample in the selected interval for each pod and its timestamp.
 // This preserves short-lived pressure across an istio-proxy container restart.
-func peakSamplesByPod(metric prometheus.Metric) map[string]podPeakSample {
+func peakSamplesByPod(metric prometheus.Metric, metricKind models.EnvoyMemoryMetric) map[string]podPeakSample {
 	peaksByPod := map[string]podPeakSample{}
 	for _, stream := range metric.Matrix {
 		pod := string(stream.Metric[model.LabelName("pod")])
@@ -613,7 +626,7 @@ func peakSamplesByPod(metric prometheus.Metric) map[string]podPeakSample {
 			value := float64(sample.Value)
 			peak := peaksByPod[pod]
 			if value > peak.value || (value == peak.value && sample.Timestamp > peak.at) {
-				peaksByPod[pod] = podPeakSample{at: sample.Timestamp, value: value}
+				peaksByPod[pod] = podPeakSample{at: sample.Timestamp, metric: metricKind, value: value}
 			}
 		}
 	}
@@ -691,19 +704,27 @@ func latestSampleTime(metrics ...prometheus.Metric) model.Time {
 	return latest
 }
 
+// sampleValueAt returns the most recent sample at or before the requested
+// time, so a scrape gap in one series at the memory-peak step does not read
+// every signal as zero. An at of 0 returns the latest sample.
 func sampleValueAt(samples []model.SamplePair, at model.Time) (float64, bool) {
+	if len(samples) == 0 {
+		return 0, false
+	}
 	if at == 0 {
-		if len(samples) == 0 {
-			return 0, false
-		}
 		return float64(samples[len(samples)-1].Value), true
 	}
-	for _, sample := range samples {
-		if sample.Timestamp == at {
-			return float64(sample.Value), true
+	index := -1
+	for i, sample := range samples {
+		if sample.Timestamp > at {
+			break
 		}
+		index = i
 	}
-	return 0, false
+	if index < 0 {
+		return 0, false
+	}
+	return float64(samples[index].Value), true
 }
 
 func maxScalarAtTime(metric prometheus.Metric, at model.Time) float64 {
@@ -787,6 +808,8 @@ func envoyActiveConnectionsAtTime(upstreamCx, downstreamCx prometheus.Metric, at
 	return int64(sumAtTime(upstreamCx, at) + sumAtTime(downstreamCx, at))
 }
 
+// resolveActiveConnectionsAtTime prefers Istio TCP opened/closed deltas for L4 workloads.
+// HTTP sidecars often report net zero on those counters while Envoy cx gauges still reflect load.
 func resolveActiveConnectionsAtTime(
 	tcpOpened, tcpClosed, upstreamCx, downstreamCx prometheus.Metric,
 	httpRequestRate float64,
@@ -814,30 +837,6 @@ func resolveActiveConnectionsAtTime(
 	return 0, false
 }
 
-func sumLatestValues(metric prometheus.Metric) float64 {
-	sum := 0.0
-	for _, stream := range metric.Matrix {
-		if len(stream.Values) == 0 {
-			continue
-		}
-		sum += float64(stream.Values[len(stream.Values)-1].Value)
-	}
-	return sum
-}
-
-func sumEnvoyRequestRate(upstream, downstream prometheus.Metric) float64 {
-	return sumLatestValues(upstream) + sumLatestValues(downstream)
-}
-
-func envoyRequestRateFromMetrics(upstreamTotal, upstream, downstream prometheus.Metric) float64 {
-	rate := sumEnvoyRequestRate(upstreamTotal, downstream)
-	if rate == 0 {
-		rate = sumEnvoyRequestRate(upstream, downstream)
-	}
-
-	return rate
-}
-
 func maxRequestRate(candidates ...float64) float64 {
 	max := 0.0
 	for _, candidate := range candidates {
@@ -848,67 +847,12 @@ func maxRequestRate(candidates ...float64) float64 {
 	return max
 }
 
-func activeTCPConnections(opened, closed prometheus.Metric) int64 {
-	active := sumLatestValues(opened) - sumLatestValues(closed)
-	if active < 0 {
-		return 0
-	}
-	return int64(active)
-}
-
 func istioTCPConnectionMetricsPresent(opened, closed prometheus.Metric) bool {
 	return len(opened.Matrix) > 0 || len(closed.Matrix) > 0
 }
 
-func envoyActiveConnections(upstreamCx, downstreamCx prometheus.Metric) int64 {
-	return int64(sumLatestValues(upstreamCx) + sumLatestValues(downstreamCx))
-}
-
 func envoyConnectionMetricsPresent(upstreamCx, downstreamCx prometheus.Metric) bool {
 	return len(upstreamCx.Matrix) > 0 || len(downstreamCx.Matrix) > 0
-}
-
-// resolveActiveConnections prefers Istio TCP opened/closed deltas for L4 workloads.
-// HTTP sidecars often report net zero on those counters while Envoy cx gauges still reflect load.
-func resolveActiveConnections(
-	tcpOpened, tcpClosed, upstreamCx, downstreamCx prometheus.Metric,
-	httpRequestRate float64,
-	trafficIsByteRate bool,
-) (active int64, observed bool) {
-	tcpObserved := istioTCPConnectionMetricsPresent(tcpOpened, tcpClosed)
-	tcpActive := activeTCPConnections(tcpOpened, tcpClosed)
-	envoyObserved := envoyConnectionMetricsPresent(upstreamCx, downstreamCx)
-	envoyActive := envoyActiveConnections(upstreamCx, downstreamCx)
-	httpTraffic := !trafficIsByteRate && httpRequestRate >= busyRequestRatePerSecond
-
-	if tcpObserved && tcpActive > 0 {
-		return tcpActive, true
-	}
-	if httpTraffic && envoyObserved && envoyActive > 0 {
-		return envoyActive, true
-	}
-	if tcpObserved {
-		return tcpActive, true
-	}
-	if envoyObserved {
-		return envoyActive, true
-	}
-	return 0, false
-}
-
-// fetchIstioHTTPRequestRate returns the HTTP request rate for this workload using Istio
-// telemetry. Source and destination reporters are queried separately because PromQL OR on
-// two scalar sums with empty metric labels retains only one operand.
-func fetchIstioHTTPRequestRate(
-	ctx context.Context,
-	prom prometheus.ClientInterface,
-	sourceLabels string,
-	destLabels string,
-	q *prometheus.RangeQuery,
-) float64 {
-	source := prom.FetchRateRange(ctx, "istio_requests_total", []string{sourceLabels}, "", q)
-	dest := prom.FetchRateRange(ctx, "istio_requests_total", []string{destLabels}, "", q)
-	return maxRequestRate(sumLatestValues(source), sumLatestValues(dest))
 }
 
 // fetchIstioTCPConnections loads a TCP counter for this workload as source or destination.
