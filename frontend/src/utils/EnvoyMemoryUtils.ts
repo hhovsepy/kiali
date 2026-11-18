@@ -272,12 +272,10 @@ export const envoyMemoryThresholdHelp = (
   }
 
   if (summary.memoryLimitBytes > 0) {
-    const limitPercent = ((summary.memoryThresholdBytes / summary.memoryLimitBytes) * 100).toFixed(1);
     return t(
-      'Container working set is unavailable. Memory is flagged as high when Envoy allocated memory exceeds {{threshold}} ({{limitPercent}}% of the selected pod memory limit of {{limit}}). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels use the same busy-traffic thresholds when memory is high.',
+      'Container working set is unavailable. Memory is flagged as high when Envoy allocated memory exceeds {{threshold}} (the smaller of the default absolute threshold and 70% of the selected pod memory limit of {{limit}}). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels use the same busy-traffic thresholds when memory is high.',
       {
         threshold,
-        limitPercent,
         limit: formatEnvoyMemoryBytes(summary.memoryLimitBytes),
         clusters: summary.largeConfigClustersThreshold
       }

@@ -106,8 +106,14 @@ func TestSelectEnvoyStatusMemory(t *testing.T) {
 	selection = selectEnvoyStatusMemory(100, allocated, prometheus.Metric{}, map[string]float64{"pod-a": 1000})
 	assert.Equal(t, 100.0, selection.MaxBytes)
 	assert.Equal(t, models.EnvoyMemoryMetricAllocated, selection.Metric)
-	// The proxy memory limit guard applies to the allocated fallback too.
-	assert.Equal(t, 700.0, selection.ThresholdBytes)
+	// Allocated is not cgroup usage, so it keeps the absolute threshold when the
+	// limit-based one would be looser (70% of 1000 = 700 > 100).
+	assert.Equal(t, 100.0, selection.ThresholdBytes)
+
+	// A small proxy limit tightens the allocated threshold to 70% of the limit.
+	selection = selectEnvoyStatusMemory(100, allocated, prometheus.Metric{}, map[string]float64{"pod-a": 100})
+	assert.Equal(t, models.EnvoyMemoryMetricAllocated, selection.Metric)
+	assert.Equal(t, 70.0, selection.ThresholdBytes)
 }
 
 func TestSelectEnvoyStatusMemoryFallsBackPerPod(t *testing.T) {

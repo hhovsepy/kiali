@@ -324,6 +324,10 @@ func envoyMemoryAbsoluteThresholds(proxyType models.EnvoyProxyType) (highMemoryB
 	}
 }
 
+// computeEnvoyMemoryThreshold returns 70% of the proxy memory limit when set,
+// otherwise the absolute threshold. Working set uses this directly; the
+// allocated fallback caps it at the absolute threshold (see
+// selectHighestMemoryPressure).
 func computeEnvoyMemoryThreshold(absoluteThreshold, proxyMemoryLimitBytes float64) float64 {
 	if proxyMemoryLimitBytes > 0 {
 		return proxyMemoryLimitBytes * envoyMemoryLimitRatio
@@ -384,6 +388,12 @@ func selectHighestMemoryPressure(peaksByPod map[string]podPeakSample, memoryLimi
 		peak := peaksByPod[pod]
 		limit := memoryLimits[pod]
 		threshold := computeEnvoyMemoryThreshold(absoluteThreshold, limit)
+		if peak.metric == models.EnvoyMemoryMetricAllocated && limit > 0 {
+			// Envoy allocated is not cgroup usage, so it keeps the absolute
+			// threshold unless the proxy limit is small enough that 70% of it
+			// is a tighter OOM-proximity guard.
+			threshold = min(absoluteThreshold, limit*envoyMemoryLimitRatio)
+		}
 		pressure := peak.value / threshold
 		if pressure < bestPressure {
 			continue
