@@ -395,9 +395,7 @@ export const EnvoyMemory: React.FC<EnvoyMemoryProps> = (props: EnvoyMemoryProps)
               isL4Proxy={summary?.trafficIsByteRate}
               isMaximized={isChartMaximized}
               lastRefreshAt={props.lastRefreshAt}
-              memoryLimitBytes={
-                summary ? Math.max(summary.memoryLimitBytes, summary.workloadMemoryLimitBytes ?? 0) : undefined
-              }
+              memoryLimitBytes={summary?.memoryLimitBytes}
               memoryThresholdBytes={summary?.memoryThresholdBytes}
               namespace={props.namespace}
               onToggleMaximized={() => setIsChartMaximized(prev => !prev)}

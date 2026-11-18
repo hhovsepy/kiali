@@ -172,14 +172,6 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 		workingSetMetric,
 		memoryLimits,
 	)
-	// The largest limit across the workload's pods, reported separately so the
-	// UI can draw a limit line even when the pod selected for status has none.
-	workloadLimitBytes := 0.0
-	for _, limit := range memoryLimits {
-		if limit > workloadLimitBytes {
-			workloadLimitBytes = limit
-		}
-	}
 	statusAt := memory.PeakAt
 	activeClustersMax, requestRate, trafficIsByteRate, activeConnections, connectionsObserved :=
 		envoyMemoryStatusTrafficSignals(
@@ -237,7 +229,6 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 		RequestRate:                  requestRate,
 		RoughConfigMemoryBytes:       activeClustersMax * roughConfigBytesPerCluster,
 		TrafficIsByteRate:            trafficIsByteRate,
-		WorkloadMemoryLimitBytes:     int64(workloadLimitBytes),
 	}, nil
 }
 
