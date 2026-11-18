@@ -138,6 +138,9 @@ const seriesName = (line: { datapoints: VCDataPoint[]; legendItem?: { name?: str
 // prefer the TCP opened/closed net when positive; Envoy cx gauges are only
 // trusted when HTTP is busy (at or above the busy request rate) or when TCP
 // telemetry is absent, so the chart cannot disagree with the summary tile.
+// The HTTP rate comes from the dashboard's "Request rate" chart; when that
+// chart is absent the rate reads as 0, matching the backend's behavior when
+// istio_requests_total is missing.
 const activeConnectionsDatapoints = (
   lines: { datapoints: VCDataPoint[]; legendItem?: { name?: string } }[],
   requestRateLines: { datapoints: VCDataPoint[]; legendItem?: { name?: string } }[],
@@ -170,6 +173,21 @@ const activeConnectionsDatapoints = (
   sumByTime(requestUpstream, requestUpstreamByTime);
   sumByTime(requestDownstream, requestDownstreamByTime);
 
+  // The request-rate series can be sampled at different timestamps than the
+  // connection series; read the nearest sample at or before each point, like
+  // the backend's sampleValueAt.
+  const valueAtOrBefore = (byTime: Map<number, number>, x: number): number => {
+    let bestTime = -1;
+    let bestValue = 0;
+    byTime.forEach((value, time) => {
+      if (time <= x && time > bestTime) {
+        bestTime = time;
+        bestValue = value;
+      }
+    });
+    return bestValue;
+  };
+
   const tcpObserved = opened.length > 0 || closed.length > 0;
   const envoyObserved = envoyCx.length > 0;
 
@@ -179,7 +197,7 @@ const activeConnectionsDatapoints = (
     .map(x => {
       const tcpActive = (openedByTime.get(x) ?? 0) - (closedByTime.get(x) ?? 0);
       const envoyActive = envoyCxByTime.get(x) ?? 0;
-      const httpRate = Math.max(requestUpstreamByTime.get(x) ?? 0, requestDownstreamByTime.get(x) ?? 0);
+      const httpRate = Math.max(valueAtOrBefore(requestUpstreamByTime, x), valueAtOrBefore(requestDownstreamByTime, x));
       const httpBusy = !isWaypointProxy && httpRate >= BUSY_REQUEST_RATE_PER_SECOND;
       let active = 0;
       if (tcpObserved && tcpActive > 0) {

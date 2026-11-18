@@ -172,17 +172,13 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 		workingSetMetric,
 		memoryLimits,
 	)
-	// Report the workload-wide max limit when the selected pod has none, so a
-	// limit set on a sibling pod stays visible in the summary and the chart.
+	// The largest limit across the workload's pods, reported separately so the
+	// UI can draw a limit line even when the pod selected for status has none.
 	workloadLimitBytes := 0.0
 	for _, limit := range memoryLimits {
 		if limit > workloadLimitBytes {
 			workloadLimitBytes = limit
 		}
-	}
-	limitBytes := memory.LimitBytes
-	if limitBytes == 0 {
-		limitBytes = workloadLimitBytes
 	}
 	statusAt := memory.PeakAt
 	activeClustersMax, requestRate, trafficIsByteRate, activeConnections, connectionsObserved :=
@@ -218,8 +214,8 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 	)
 
 	var memoryUsedPercent float64
-	if limitBytes > 0 {
-		memoryUsedPercent = (memory.MaxBytes / limitBytes) * 100
+	if memory.LimitBytes > 0 {
+		memoryUsedPercent = (memory.MaxBytes / memory.LimitBytes) * 100
 	}
 
 	return &models.EnvoyMemorySummary{
@@ -232,7 +228,7 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 		Cause:                        cause,
 		ConfigCountsPod:              memory.Pod,
 		LargeConfigClustersThreshold: largeConfigClusters,
-		MemoryLimitBytes:             int64(limitBytes),
+		MemoryLimitBytes:             int64(memory.LimitBytes),
 		MemoryMaxBytes:               int64(memory.MaxBytes),
 		MemoryMetric:                 memory.Metric,
 		MemoryThresholdBytes:         int64(memory.ThresholdBytes),
@@ -241,6 +237,7 @@ func (in *EnvoyMemoryService) GetSummary(ctx context.Context, workload *models.W
 		RequestRate:                  requestRate,
 		RoughConfigMemoryBytes:       activeClustersMax * roughConfigBytesPerCluster,
 		TrafficIsByteRate:            trafficIsByteRate,
+		WorkloadMemoryLimitBytes:     int64(workloadLimitBytes),
 	}, nil
 }
 

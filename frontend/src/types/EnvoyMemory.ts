@@ -23,6 +23,7 @@ export type EnvoyMemorySummary = {
   requestRate: number;
   roughConfigMemoryBytes: number;
   trafficIsByteRate?: boolean;
+  workloadMemoryLimitBytes?: number;
 };
 
 export type EnvoyConfigCounts = {

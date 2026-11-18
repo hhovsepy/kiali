@@ -246,7 +246,7 @@ export const envoyMemoryThresholdHelp = (
   if (usesWorkingSet && summary.memoryLimitBytes > 0) {
     const limitPercent = ((summary.memoryThresholdBytes / summary.memoryLimitBytes) * 100).toFixed(1);
     return t(
-      'Memory is flagged as high when container working set for istio-proxy exceeds {{threshold}} ({{limitPercent}}% of its memory limit of {{limit}} from container_spec_memory_limit_bytes or sidecar.istio.io/proxyMemoryLimit). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels: likely traffic when HTTP is about {{busyRequestRate}} or more, TCP is about {{busyTCPBytes}} or more on waypoints, or active connections are {{busyConnections}} or more when observed; likely configuration when clusters are above that limit and traffic is not busy.',
+      'Memory is flagged as high when container working set for istio-proxy exceeds {{threshold}} ({{limitPercent}}% of the selected pod memory limit of {{limit}} from container_spec_memory_limit_bytes or sidecar.istio.io/proxyMemoryLimit). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels: likely traffic when HTTP is about {{busyRequestRate}} or more, TCP is about {{busyTCPBytes}} or more on waypoints, or active connections are {{busyConnections}} or more when observed; likely configuration when clusters are above that limit and traffic is not busy.',
       {
         limitPercent,
         threshold,
@@ -262,10 +262,23 @@ export const envoyMemoryThresholdHelp = (
 
   if (usesWorkingSet) {
     return t(
-      'Memory is flagged as high when container working set for istio-proxy exceeds {{threshold}} (default absolute threshold for {{proxyType}}; no proxy memory limit is set). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels use the same busy-traffic thresholds as above when memory is high.',
+      'Memory is flagged as high when container working set for istio-proxy exceeds {{threshold}} (default absolute threshold for {{proxyType}}; no proxy memory limit is set on the selected pod). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels use the same busy-traffic thresholds as above when memory is high.',
       {
         threshold,
         proxyType: proxyLabel,
+        clusters: summary.largeConfigClustersThreshold
+      }
+    );
+  }
+
+  if (summary.memoryLimitBytes > 0) {
+    const limitPercent = ((summary.memoryThresholdBytes / summary.memoryLimitBytes) * 100).toFixed(1);
+    return t(
+      'Container working set is unavailable. Memory is flagged as high when Envoy allocated memory exceeds {{threshold}} ({{limitPercent}}% of the selected pod memory limit of {{limit}}). Large configuration is considered when active clusters exceed {{clusters}}. Cause labels use the same busy-traffic thresholds when memory is high.',
+      {
+        threshold,
+        limitPercent,
+        limit: formatEnvoyMemoryBytes(summary.memoryLimitBytes),
         clusters: summary.largeConfigClustersThreshold
       }
     );

@@ -43,7 +43,10 @@ type EnvoyMemorySummary struct {
 	Cause                        EnvoyMemoryCause `json:"cause"`
 	ConfigCountsPod              string           `json:"configCountsPod"`
 	LargeConfigClustersThreshold int64            `json:"largeConfigClustersThreshold"`
-	MemoryLimitBytes             int64            `json:"memoryLimitBytes"`
+	// MemoryLimitBytes is the proxy memory limit of the pod selected for status;
+	// MemoryThresholdBytes and MemoryUsedPercent are relative to it. It is 0 when
+	// that pod has no limit (see WorkloadMemoryLimitBytes).
+	MemoryLimitBytes int64 `json:"memoryLimitBytes"`
 	// MemoryMaxBytes is the peak of the metric used for status. MemoryMetric identifies
 	// whether this is istio-proxy cgroup working set or Envoy allocated memory.
 	MemoryMaxBytes         int64             `json:"memoryMaxBytes"`
@@ -54,4 +57,8 @@ type EnvoyMemorySummary struct {
 	RequestRate            float64           `json:"requestRate"`
 	RoughConfigMemoryBytes int64             `json:"roughConfigMemoryBytes"`
 	TrafficIsByteRate      bool              `json:"trafficIsByteRate"`
+	// WorkloadMemoryLimitBytes is the largest proxy memory limit across the
+	// workload's pods, for display. It differs from MemoryLimitBytes when the
+	// pod selected for status has no limit but a sibling pod does.
+	WorkloadMemoryLimitBytes int64 `json:"workloadMemoryLimitBytes"`
 }

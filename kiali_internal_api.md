@@ -11547,6 +11547,7 @@ associated configuration.
 | RequestRate | double (formatted number)| `float64` |  | |  |  |
 | RoughConfigMemoryBytes | int64 (formatted integer)| `int64` |  | |  |  |
 | TrafficIsByteRate | boolean| `bool` |  | |  |  |
+| WorkloadMemoryLimitBytes | int64 (formatted integer)| `int64` |  | |  |  |
 | cause | [EnvoyMemoryCause](#envoy-memory-cause)| `EnvoyMemoryCause` |  | |  |  |
 | proxyType | [EnvoyProxyType](#envoy-proxy-type)| `EnvoyProxyType` |  | |  |  |
 
